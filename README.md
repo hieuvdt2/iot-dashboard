@@ -1,70 +1,149 @@
-# Getting Started with Create React App
+# 📊 IoT Dashboard — Multi-Platform (Web · Mobile · Desktop)
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Dashboard theo dõi dữ liệu cảm biến ESP32 theo thời gian thực qua MQTT.
 
-## Available Scripts
+---
 
-In the project directory, you can run:
+## Cấu trúc dự án
 
-### `npm start`
+```
+iot-dashboard/
+├── src/                          # Web App (CRA - React)
+│   ├── shared/
+│   │   ├── components/
+│   │   │   ├── SensorCard.jsx    # Hiển thị 4 giá trị cảm biến
+│   │   │   ├── SensorChart.jsx   # Biểu đồ realtime (Recharts)
+│   │   │   └── ControlButtons.jsx# Nút bật/tắt bơm
+│   │   ├── services/
+│   │   │   └── mqttService.js    # Kết nối MQTT qua WebSocket
+│   │   └── utils/
+│   │       └── sensorHistory.js  # Quản lý lịch sử dữ liệu
+│   ├── App.js                    # Dashboard chính
+│   └── App.css                   # Dark theme styles
+│
+├── mobile/                       # Mobile App (Expo / React Native)
+│   ├── src/
+│   │   ├── components/           # RN components (SensorCard, Chart, Controls)
+│   │   ├── services/             # MQTT service (React Native)
+│   │   └── utils/                # History + AsyncStorage
+│   ├── App.js                    # Entry point
+│   └── package.json
+│
+├── desktop/                      # Desktop App (Electron)
+│   ├── main.js                   # Electron main process
+│   ├── preload.js                # Context bridge
+│   └── package.json
+│
+└── server/                       # Node.js MQTT Bridge (tùy chọn)
+    ├── server.js                 # MQTT ↔ Socket.IO bridge
+    └── package.json
+```
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+---
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Cài đặt & Chạy
 
-### `npm test`
+### 1. Web (React)
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+```bash
+# Tại thư mục gốc
+npm install
+npm start
+# Mở: http://localhost:3000
+```
 
-### `npm run build`
+### 2. Mobile (Expo)
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```bash
+cd mobile
+npm install
+npx expo start
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+# Chạy trên điện thoại: quét QR bằng Expo Go
+# Chạy Android emulator: npm run android
+# Chạy iOS simulator: npm run ios
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### 3. Desktop (Electron)
 
-### `npm run eject`
+```bash
+# Bước 1: Build web app
+npm run build
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+# Bước 2: Cài Electron
+cd desktop
+npm install
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+# Bước 3: Chạy Electron (dùng production build)
+npm start
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+# Hoặc chạy với dev server (cần web đang chạy ở port 3000)
+npm run dev
+```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+### 4. Server MQTT Bridge (tùy chọn)
 
-## Learn More
+Dùng khi cần bridge MQTT ↔ Socket.IO cho các client không hỗ trợ WebSocket trực tiếp.
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```bash
+cd server
+npm install
+npm start
+# Server chạy tại: http://localhost:3001
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+---
 
-### Code Splitting
+## Cấu hình MQTT
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+| Thông số | Giá trị |
+|----------|---------|
+| Broker | HiveMQ Cloud |
+| URL (WebSocket) | `wss://...hivemq.cloud:8884/mqtt` |
+| URL (Server) | `mqtts://...hivemq.cloud:8883` |
+| Username | `location` |
+| Password | `Abc12345` |
+| Topic Sensor | `esp32/sensor` |
+| Topic Control | `esp32/control` |
 
-### Analyzing the Bundle Size
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+## Dữ liệu ESP32
 
-### Making a Progressive Web App
+JSON format từ topic `esp32/sensor`:
+```json
+{
+  "nhiet_do": 28.5,
+  "do_am_khong_khi": 65,
+  "do_am_dat": 42,
+  "muc_nuoc": 15
+}
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+Lệnh điều khiển bơm (topic `esp32/control`):
+- `"bat_bom"` — Bật bơm
+- `"tat_bom"` — Tắt bơm
 
-### Advanced Configuration
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+## Tính năng
 
-### Deployment
+- **Realtime**: Cập nhật dữ liệu liên tục qua MQTT WebSocket
+- **SensorCard**: Hiển thị nhiệt độ, độ ẩm đất, độ ẩm không khí, mực nước
+- **SensorChart**: Biểu đồ line chart realtime, toggle từng sensor
+- **ControlButtons**: Bật/tắt bơm nước với feedback trạng thái
+- **History Table**: Bảng lịch sử với bộ lọc và lưu vào localStorage
+- **Responsive**: Tối ưu cho desktop, tablet và mobile
+- **Dark Theme**: Giao diện tối hiện đại
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+---
 
-### `npm run build` fails to minify
+## Dependencies chính
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+| Package | Mục đích |
+|---------|---------|
+| `mqtt` | MQTT client (hỗ trợ WebSocket) |
+| `recharts` | Biểu đồ cho Web |
+| `react-native-chart-kit` | Biểu đồ cho Mobile |
+| `electron` | Desktop wrapper |
+| `socket.io` | Realtime bridge (server) |
