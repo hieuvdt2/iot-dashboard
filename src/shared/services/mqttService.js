@@ -13,6 +13,7 @@ const MQTT_OPTIONS = {
 export const TOPICS = {
   SENSOR: 'esp32/sensor',
   CONTROL: 'esp32/control',
+  CONFIG: 'esp32/config',
 };
 
 class MqttService {
@@ -85,6 +86,18 @@ class MqttService {
       });
     } else {
       console.warn('[MQTT] Cannot publish: not connected');
+    }
+  }
+
+  publishConfig(config) {
+    if (this.client && this.connected) {
+      const payload = JSON.stringify(config);
+      this.client.publish(TOPICS.CONFIG, payload, { qos: 1 }, (err) => {
+        if (err) console.error('[MQTT] Publish config error:', err);
+        else console.log(`[MQTT] Published to ${TOPICS.CONFIG}: ${payload}`);
+      });
+    } else {
+      console.warn('[MQTT] Cannot publish config: not connected');
     }
   }
 

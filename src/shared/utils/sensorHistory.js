@@ -4,6 +4,7 @@ export const SENSOR_KEYS = [
   { key: 'nhiet_do', label: 'Nhiệt độ (°C)', color: '#ff6b6b' },
   { key: 'do_am_khong_khi', label: 'Độ ẩm KK (%)', color: '#4dabf7' },
   { key: 'do_am_dat', label: 'Độ ẩm đất (%)', color: '#51cf66' },
+  { key: 'anh_sang', label: 'Ánh sáng (lux)', color: '#ffa94d' },
   { key: 'muc_nuoc', label: 'Mực nước (cm)', color: '#ffd43b' },
 ];
 
@@ -19,6 +20,7 @@ export function addToHistory(prevHistory, newData) {
     nhiet_do: newData.nhiet_do ?? null,
     do_am_khong_khi: newData.do_am_khong_khi ?? null,
     do_am_dat: newData.do_am_dat ?? null,
+    anh_sang: newData.anh_sang ?? null,
     muc_nuoc: newData.muc_nuoc ?? null,
   };
 
@@ -35,6 +37,7 @@ export function getChartData(history) {
     'Nhiệt độ (°C)': item.nhiet_do,
     'Độ ẩm KK (%)': item.do_am_khong_khi,
     'Độ ẩm đất (%)': item.do_am_dat,
+    'Ánh sáng (lux)': item.anh_sang,
     'Mực nước (cm)': item.muc_nuoc,
   }));
 }

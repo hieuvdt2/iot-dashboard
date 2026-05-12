@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { mqttService } from '../services/mqttService';
 
-function ControlButtons({ connected }) {
+function ControlButtons({ connected, autoMode, pumpStatus }) {
   const [lastAction, setLastAction] = useState(null);
   const [sending, setSending] = useState(false);
 
@@ -12,6 +12,19 @@ function ControlButtons({ connected }) {
     setLastAction({ command, label, time: new Date().toLocaleTimeString('vi-VN') });
     setTimeout(() => setSending(false), 1000);
   };
+
+  const isAuto = autoMode === 'BAT';
+  const isWatering = pumpStatus === 'DANG_TUOI';
+  const modeLabel = isAuto ? 'Tự động' : 'Thủ công';
+  const pumpLabel = isWatering ? 'Tắt bơm' : 'Bật bơm';
+  const pumpCommand = isWatering ? 'tat_bom' : 'bat_bom';
+  const modeCommand = isAuto ? 'auto_off' : 'auto_on';
+  const modeActionLabel = isAuto ? 'Tắt AUTO' : 'Bật AUTO';
+  const pumpStatusLabelMap = {
+    DANG_TUOI: 'Đang tưới',
+    KHONG_TUOI: 'Không tưới',
+  };
+  const pumpStatusLabel = pumpStatusLabelMap[pumpStatus] || pumpStatus || '---';
 
   return (
     <div className="control-section">
@@ -24,29 +37,40 @@ function ControlButtons({ connected }) {
         )}
       </div>
 
+      <div className="control-status">
+        <span className="status-pill">Chế độ: {modeLabel}</span>
+        <span className="status-pill">Bơm: {pumpStatusLabel}</span>
+      </div>
+
       <div className="control-buttons">
         <button
-          className={`btn btn-on ${sending ? 'sending' : ''}`}
-          onClick={() => handleControl('bat_bom', 'Bật bơm')}
+          className={`btn btn-auto ${sending ? 'sending' : ''}`}
+          onClick={() => handleControl(modeCommand, modeActionLabel)}
           disabled={!connected || sending}
         >
-          <span className="btn-icon">💦</span>
-          <span>Bật bơm</span>
+          <span className="btn-icon">🧠</span>
+          <span>{modeActionLabel}</span>
         </button>
 
         <button
-          className={`btn btn-off ${sending ? 'sending' : ''}`}
-          onClick={() => handleControl('tat_bom', 'Tắt bơm')}
-          disabled={!connected || sending}
+          className={`btn ${isWatering ? 'btn-off' : 'btn-on'} ${sending ? 'sending' : ''}`}
+          onClick={() => handleControl(pumpCommand, pumpLabel)}
+          disabled={!connected || sending || isAuto}
         >
-          <span className="btn-icon">🛑</span>
-          <span>Tắt bơm</span>
+          <span className="btn-icon">💦</span>
+          <span>{pumpLabel}</span>
         </button>
       </div>
 
       {!connected && (
         <div className="control-warning">
           ⚠️ Cần kết nối MQTT để điều khiển bơm
+        </div>
+      )}
+
+      {isAuto && (
+        <div className="control-warning">
+          ⚠️ Đang ở chế độ AUTO, khóa điều khiển thủ công
         </div>
       )}
     </div>

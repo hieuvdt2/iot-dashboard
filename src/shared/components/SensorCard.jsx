@@ -26,6 +26,14 @@ const SENSOR_CONFIG = [
     bg: 'rgba(81,207,102,0.08)',
   },
   {
+    key: 'anh_sang',
+    label: 'Ánh sáng',
+    unit: 'lux',
+    icon: '💡',
+    color: '#ffa94d',
+    bg: 'rgba(255,169,77,0.08)',
+  },
+  {
     key: 'muc_nuoc',
     label: 'Mực nước',
     unit: 'cm',
