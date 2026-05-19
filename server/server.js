@@ -3,6 +3,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const admin = require('firebase-admin');
 
 // ===== MQTT CONFIG =====
 const MQTT_URL = 'mqtts://916cc55df8ed4fa2bfff8e4d25fd0f56.s1.eu.hivemq.cloud:8883';
@@ -17,6 +18,101 @@ const MQTT_OPTIONS = {
 const TOPICS = {
   SENSOR: 'esp32/sensor',
   CONTROL: 'esp32/control',
+  CONFIG: 'esp32/config',
+};
+
+// ===== FIREBASE CONFIG =====
+const FIREBASE_DB_URL =
+  process.env.FIREBASE_DB_URL ||
+  'https://smart-garden-eace0-default-rtdb.asia-southeast1.firebasedatabase.app';
+const FIREBASE_SERVICE_ACCOUNT =
+  process.env.FIREBASE_SERVICE_ACCOUNT ||
+  path.join(__dirname, 'smart-garden-firebase.json');
+const DEVICE_ID = process.env.DEVICE_ID || 'esp32_01';
+
+let firebaseReady = false;
+let firebaseDb = null;
+
+try {
+  const serviceAccount = require(FIREBASE_SERVICE_ACCOUNT);
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    databaseURL: FIREBASE_DB_URL,
+  });
+  firebaseDb = admin.database();
+  firebaseReady = true;
+  console.log('[Firebase] Connected');
+} catch (err) {
+  console.error('[Firebase] Init error:', err.message);
+}
+
+const normalizeSensorPayload = (data) => {
+  if (!data || typeof data !== 'object') return null;
+
+  const soil = data.soil ?? data.do_am_dat;
+  const temp = data.temp ?? data.nhiet_do;
+  const humi = data.humi ?? data.do_am_khong_khi;
+  const lux = data.lux ?? data.anh_sang;
+  const distance = data.distance ?? data.muc_nuoc;
+
+  let auto = data.auto;
+  if (auto === undefined && typeof data.auto_mode === 'string') {
+    auto = data.auto_mode === 'BAT';
+  }
+
+  let pump = data.pump;
+  if (pump === undefined && typeof data.trang_thai_bom === 'string') {
+    pump = data.trang_thai_bom === 'DANG_TUOI';
+  }
+
+  const config = data.config ?? data.has_config;
+  const ts = Date.now();
+
+  const normalized = {
+    soil,
+    temp,
+    humi,
+    lux,
+    distance,
+    pump,
+    auto,
+    config,
+    ts,
+  };
+
+  if (soil !== undefined) normalized.do_am_dat = soil;
+  if (temp !== undefined) normalized.nhiet_do = temp;
+  if (humi !== undefined) normalized.do_am_khong_khi = humi;
+  if (lux !== undefined) normalized.anh_sang = lux;
+  if (distance !== undefined) normalized.muc_nuoc = distance;
+  if (config !== undefined) normalized.has_config = config;
+  if (auto !== undefined) normalized.auto_mode = auto ? 'BAT' : 'TAT';
+  if (pump !== undefined) {
+    normalized.trang_thai_bom = pump ? 'DANG_TUOI' : 'KHONG_TUOI';
+  }
+
+  return normalized;
+};
+
+const writeSensorToFirebase = async (payload) => {
+  if (!firebaseReady || !firebaseDb || !payload) return;
+
+  const ts = payload.ts || Date.now();
+  const dateKey = new Date(ts).toISOString().slice(0, 10);
+  const deviceRef = firebaseDb.ref(`devices/${DEVICE_ID}`);
+
+  await deviceRef.child('latest').set(payload);
+  await deviceRef.child(`history/${dateKey}/${ts}`).set(payload);
+};
+
+const writeConfigToFirebase = async (config) => {
+  if (!firebaseReady || !firebaseDb || !config) return;
+
+  const deviceRef = firebaseDb.ref(`devices/${DEVICE_ID}`);
+  await deviceRef.child('config').set({
+    ...config,
+    updatedAt: Date.now(),
+  });
 };
 
 // ===== EXPRESS + SOCKET.IO =====
@@ -60,6 +156,10 @@ mqttClient.on('connect', () => {
     if (err) console.error('[MQTT] Subscribe error:', err);
     else console.log(`[MQTT] Subscribed to ${TOPICS.SENSOR}`);
   });
+  mqttClient.subscribe(TOPICS.CONFIG, (err) => {
+    if (err) console.error('[MQTT] Subscribe error:', err);
+    else console.log(`[MQTT] Subscribed to ${TOPICS.CONFIG}`);
+  });
 });
 
 mqttClient.on('message', (topic, message) => {
@@ -68,12 +168,30 @@ mqttClient.on('message', (topic, message) => {
 
   if (topic === TOPICS.SENSOR) {
     try {
-      lastSensorData = JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      const normalized = normalizeSensorPayload(parsed);
+      lastSensorData = normalized || parsed;
+
       // Broadcast to all Socket.IO clients
-      io.emit('sensor', raw);
+      io.emit('sensor', JSON.stringify(lastSensorData));
+
+      writeSensorToFirebase(lastSensorData).catch((err) => {
+        console.error('[Firebase] Write sensor error:', err.message);
+      });
     } catch (e) {
       console.error('[MQTT] Failed to parse:', e);
       io.emit('sensor', raw);
+    }
+  }
+
+  if (topic === TOPICS.CONFIG) {
+    try {
+      const parsed = JSON.parse(raw);
+      writeConfigToFirebase(parsed).catch((err) => {
+        console.error('[Firebase] Write config error:', err.message);
+      });
+    } catch (e) {
+      console.error('[MQTT] Failed to parse config:', e);
     }
   }
 });
@@ -125,4 +243,6 @@ server.listen(PORT, () => {
   console.log(`   Local:   http://localhost:${PORT}`);
   console.log(`   MQTT:    ${MQTT_URL}`);
   console.log(`   Topics:  ${TOPICS.SENSOR} (sub), ${TOPICS.CONTROL} (pub)\n`);
+  console.log(`   Firebase: ${firebaseReady ? 'ready' : 'not ready'}`);
+  console.log(`   Device:   ${DEVICE_ID}\n`);
 });

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { mqttService } from '../services/mqttService';
 
-function ControlButtons({ connected, autoMode, pumpStatus }) {
+function ControlButtons({ connected, autoMode, pumpStatus, canControl }) {
   const [lastAction, setLastAction] = useState(null);
   const [sending, setSending] = useState(false);
 
   const handleControl = (command, label) => {
-    if (!connected || sending) return;
+    if (!connected || sending || !canControl) return;
     setSending(true);
     mqttService.publishControl(command);
     setLastAction({ command, label, time: new Date().toLocaleTimeString('vi-VN') });
@@ -46,7 +46,7 @@ function ControlButtons({ connected, autoMode, pumpStatus }) {
         <button
           className={`btn btn-auto ${sending ? 'sending' : ''}`}
           onClick={() => handleControl(modeCommand, modeActionLabel)}
-          disabled={!connected || sending}
+          disabled={!connected || sending || !canControl}
         >
           <span className="btn-icon">🧠</span>
           <span>{modeActionLabel}</span>
@@ -55,7 +55,7 @@ function ControlButtons({ connected, autoMode, pumpStatus }) {
         <button
           className={`btn ${isWatering ? 'btn-off' : 'btn-on'} ${sending ? 'sending' : ''}`}
           onClick={() => handleControl(pumpCommand, pumpLabel)}
-          disabled={!connected || sending || isAuto}
+          disabled={!connected || sending || isAuto || !canControl}
         >
           <span className="btn-icon">💦</span>
           <span>{pumpLabel}</span>
@@ -65,6 +65,12 @@ function ControlButtons({ connected, autoMode, pumpStatus }) {
       {!connected && (
         <div className="control-warning">
           ⚠️ Cần kết nối MQTT để điều khiển bơm
+        </div>
+      )}
+
+      {!canControl && (
+        <div className="control-warning">
+          ⚠️ Bạn không có quyền điều khiển bơm
         </div>
       )}
 

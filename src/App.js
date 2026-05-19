@@ -1,55 +1,156 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import './App.css';
 
-import SensorCard from './shared/components/SensorCard';
-import SensorChart from './shared/components/SensorChart';
-import ControlButtons from './shared/components/ControlButtons';
+import DashboardPage from './shared/components/DashboardPage';
+import ConfigPage from './shared/components/ConfigPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import AdminPage from './pages/AdminPage';
 import { mqttService } from './shared/services/mqttService';
+import { firebaseService } from './shared/services/firebaseService';
 import {
-  addToHistory,
-  loadHistoryFromStorage,
-  saveHistoryToStorage,
+  buildHistoryFromFirebase,
 } from './shared/utils/sensorHistory';
+
+const DEFAULT_CONFIG = {
+  minSoil: 35,
+  targetSoil: 65,
+  maxTemp: 35,
+  minAirHum: 50,
+  maxLux: 20000,
+  maxWaterDistance: 20,
+};
+
+const BASE_PRESETS = [
+  {
+    key: 'rau',
+    name: 'Rau',
+    isCustom: false,
+    config: {
+      minSoil: 45,
+      targetSoil: 70,
+      maxTemp: 32,
+      minAirHum: 55,
+      maxLux: 18000,
+      maxWaterDistance: 20,
+    },
+  },
+  {
+    key: 'xuong_rong',
+    name: 'Xương rồng',
+    isCustom: false,
+    config: {
+      minSoil: 15,
+      targetSoil: 30,
+      maxTemp: 38,
+      minAirHum: 35,
+      maxLux: 22000,
+      maxWaterDistance: 25,
+    },
+  },
+  {
+    key: 'lan',
+    name: 'Lan',
+    isCustom: false,
+    config: {
+      minSoil: 40,
+      targetSoil: 60,
+      maxTemp: 30,
+      minAirHum: 60,
+      maxLux: 16000,
+      maxWaterDistance: 20,
+    },
+  },
+  {
+    key: 'cay_canh',
+    name: 'Cây cảnh',
+    isCustom: false,
+    config: {
+      minSoil: 35,
+      targetSoil: 55,
+      maxTemp: 34,
+      minAirHum: 50,
+      maxLux: 18000,
+      maxWaterDistance: 20,
+    },
+  },
+];
+
+const CUSTOM_PRESETS_KEY = 'iot_presets_custom';
+
+const loadCustomPresets = () => {
+  try {
+    const saved = localStorage.getItem(CUSTOM_PRESETS_KEY);
+    const parsed = saved ? JSON.parse(saved) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((item) => ({
+      ...item,
+      isCustom: true,
+    }));
+  } catch (e) {
+    return [];
+  }
+};
+
+const saveCustomPresets = (presets) => {
+  try {
+    localStorage.setItem(CUSTOM_PRESETS_KEY, JSON.stringify(presets));
+  } catch (e) {
+    // Ignore storage errors.
+  }
+};
+
+const toPresetKey = (name) =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s_-]/g, '')
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_');
 
 function App() {
   const [sensorData, setSensorData] = useState(null);
-  const [history, setHistory] = useState(() => loadHistoryFromStorage());
+  const [history, setHistory] = useState([]);
   const [connected, setConnected] = useState(false);
   const [mqttStatus, setMqttStatus] = useState('connecting');
   const [historyFilter, setHistoryFilter] = useState(20);
+  const [historyDate, setHistoryDate] = useState(() =>
+    new Date().toISOString().slice(0, 10)
+  );
   const [toast, setToast] = useState(null);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [selectedPreset, setSelectedPreset] = useState('');
+  const [customPresets, setCustomPresets] = useState(() => loadCustomPresets());
+  const [authUser, setAuthUser] = useState(null);
+  const [role, setRole] = useState('viewer');
+  const [authError, setAuthError] = useState('');
+  const [users, setUsers] = useState({});
+  const [roles, setRoles] = useState({});
+  const [configReady, setConfigReady] = useState(() => {
+    try {
+      return Boolean(localStorage.getItem('iot_thresholds'));
+    } catch (e) {
+      return false;
+    }
+  });
   const [thresholds, setThresholds] = useState(() => {
     try {
       const saved = localStorage.getItem('iot_thresholds');
       return saved
         ? JSON.parse(saved)
-        : {
-            minSoil: 35,
-            targetSoil: 65,
-            maxTemp: 35,
-            minAirHum: 50,
-            maxLux: 20000,
-            maxWaterDistance: 20,
-          };
+        : DEFAULT_CONFIG;
     } catch (e) {
-      return {
-        minSoil: 35,
-        targetSoil: 65,
-        maxTemp: 35,
-        minAirHum: 50,
-        maxLux: 20000,
-        maxWaterDistance: 20,
-      };
+      return DEFAULT_CONFIG;
     }
   });
 
+  const presets = [...BASE_PRESETS, ...customPresets];
+  const canEdit = role === 'admin';
+  const canControl = role === 'admin';
+
   const handleSensor = useCallback((data) => {
     setSensorData(data);
-    setHistory((prev) => {
-      const updated = addToHistory(prev, data);
-      saveHistoryToStorage(updated);
-      return updated;
-    });
   }, []);
 
   const handleConnect = useCallback((status) => {
@@ -61,21 +162,99 @@ function App() {
   }, []);
 
   useEffect(() => {
-    mqttService.on('sensor', handleSensor);
     mqttService.on('connect', handleConnect);
     mqttService.on('status', handleStatus);
     mqttService.connect();
 
     return () => {
-      mqttService.off('sensor', handleSensor);
       mqttService.off('connect', handleConnect);
       mqttService.off('status', handleStatus);
     };
   }, [handleSensor, handleConnect, handleStatus]);
 
+  useEffect(() => {
+    const unsubscribeLatest = firebaseService.subscribeLatest(handleSensor);
+    return () => unsubscribeLatest();
+  }, [handleSensor]);
+
+  useEffect(() => {
+    const unsubscribeHistory = firebaseService.subscribeHistory(
+      historyDate,
+      (data) => {
+        setHistory(buildHistoryFromFirebase(data));
+      }
+    );
+    return () => unsubscribeHistory();
+  }, [historyDate]);
+
+  useEffect(() => {
+    const unsubscribePresets = firebaseService.subscribePresets((data) => {
+      const entries = Object.entries(data || {}).map(([key, value]) => ({
+        key,
+        name: value.name,
+        config: value.config,
+        isCustom: true,
+      }));
+      setCustomPresets(entries);
+      saveCustomPresets(entries);
+    });
+
+    return () => unsubscribePresets();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribeConfig = firebaseService.subscribeConfig((config) => {
+      const cleaned = { ...config };
+      delete cleaned.updatedAt;
+      setThresholds((prev) => ({ ...prev, ...cleaned }));
+      setConfigReady(true);
+      try {
+        localStorage.setItem('iot_thresholds', JSON.stringify(cleaned));
+      } catch (e) {
+        // Ignore storage errors.
+      }
+    });
+
+    return () => unsubscribeConfig();
+  }, []);
+
+  useEffect(() => {
+    let roleUnsubscribe = null;
+    const unsubscribe = firebaseService.onAuthStateChanged((user) => {
+      setAuthUser(user);
+      setAuthError('');
+      if (roleUnsubscribe) roleUnsubscribe();
+      if (user) {
+        roleUnsubscribe = firebaseService.subscribeRole(user.uid, setRole);
+      } else {
+        setRole('viewer');
+      }
+    });
+
+    return () => {
+      if (roleUnsubscribe) roleUnsubscribe();
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!authUser || role !== 'admin') {
+      setUsers({});
+      setRoles({});
+      return undefined;
+    }
+
+    const unsubscribeUsers = firebaseService.subscribeUsers(setUsers);
+    const unsubscribeRoles = firebaseService.subscribeRoles(setRoles);
+
+    return () => {
+      unsubscribeUsers();
+      unsubscribeRoles();
+    };
+  }, [authUser, role]);
+
   const clearHistory = () => {
     setHistory([]);
-    saveHistoryToStorage([]);
   };
 
   useEffect(() => {
@@ -85,13 +264,122 @@ function App() {
   }, [toast]);
 
   const updateThreshold = (key, value) => {
+    if (!canEdit) {
+      setToast({ type: 'warning', message: 'Bạn không có quyền chỉnh cấu hình.' });
+      return;
+    }
+    setSelectedPreset('');
     setThresholds((prev) => ({ ...prev, [key]: value }));
   };
 
   const saveThresholds = () => {
+    if (!canEdit) {
+      setToast({ type: 'warning', message: 'Bạn không có quyền chỉnh cấu hình.' });
+      return;
+    }
     localStorage.setItem('iot_thresholds', JSON.stringify(thresholds));
+    firebaseService.saveConfig(thresholds);
     mqttService.publishConfig(thresholds);
+    setConfigReady(true);
     setToast({ type: 'success', message: 'Đã gửi cấu hình xuống ESP32' });
+  };
+
+  const applyPreset = (presetKey) => {
+    if (!canEdit) {
+      setToast({ type: 'warning', message: 'Bạn không có quyền chỉnh preset.' });
+      return;
+    }
+    if (!presetKey) {
+      setSelectedPreset('');
+      return;
+    }
+    const preset = presets.find((item) => item.key === presetKey);
+    if (!preset) return;
+    setSelectedPreset(presetKey);
+    setThresholds(preset.config);
+    localStorage.setItem('iot_thresholds', JSON.stringify(preset.config));
+    firebaseService.saveConfig(preset.config);
+    mqttService.publishConfig(preset.config);
+    setConfigReady(true);
+    setToast({ type: 'success', message: `Đã áp dụng preset: ${preset.name}` });
+  };
+
+  const addPreset = (name, config) => {
+    if (!canEdit) {
+      setToast({ type: 'warning', message: 'Bạn không có quyền thêm preset.' });
+      return;
+    }
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setToast({ type: 'warning', message: 'Vui lòng nhập tên preset.' });
+      return;
+    }
+    const baseKey = toPresetKey(trimmed) || 'preset';
+    const existingKeys = new Set(presets.map((item) => item.key));
+    let key = baseKey;
+    let suffix = 2;
+    while (existingKeys.has(key)) {
+      key = `${baseKey}_${suffix}`;
+      suffix += 1;
+    }
+    const newPreset = { key, name: trimmed, config: { ...config }, isCustom: true };
+    firebaseService.savePreset(key, { name: trimmed, config: { ...config } });
+    setSelectedPreset(key);
+    setToast({ type: 'success', message: `Đã thêm preset: ${trimmed}` });
+  };
+
+  const updatePreset = (presetKey, name, config) => {
+    if (!canEdit) {
+      setToast({ type: 'warning', message: 'Bạn không có quyền sửa preset.' });
+      return;
+    }
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setToast({ type: 'warning', message: 'Vui lòng nhập tên preset.' });
+      return;
+    }
+    firebaseService.savePreset(presetKey, { name: trimmed, config: { ...config } });
+    if (selectedPreset === presetKey) {
+      setThresholds(config);
+    }
+    setToast({ type: 'success', message: `Đã cập nhật preset: ${trimmed}` });
+  };
+
+  const deletePreset = (presetKey) => {
+    if (!canEdit) {
+      setToast({ type: 'warning', message: 'Bạn không có quyền xóa preset.' });
+      return;
+    }
+    firebaseService.deletePreset(presetKey);
+    if (selectedPreset === presetKey) {
+      setSelectedPreset('');
+    }
+    setToast({ type: 'success', message: 'Đã xóa preset.' });
+  };
+
+  const handleSignIn = async (email, password) => {
+    try {
+      await firebaseService.signIn(email, password);
+    } catch (err) {
+      setAuthError('Sai email hoặc mật khẩu.');
+    }
+  };
+
+  const handleSignUp = async (email, password) => {
+    try {
+      await firebaseService.signUp(email, password);
+    } catch (err) {
+      setAuthError('Không thể đăng ký. Vui lòng thử lại.');
+    }
+  };
+
+  const handleSignOut = async () => {
+    await firebaseService.signOut();
+  };
+
+  const handleSetRole = async (uid, nextRole) => {
+    if (!canEdit) return;
+    await firebaseService.setUserRole(uid, nextRole);
   };
 
   const statusLabel = {
@@ -103,10 +391,12 @@ function App() {
   };
   const currentStatus = statusLabel[mqttStatus] || statusLabel.connecting;
 
-  const displayedHistory = [...history].reverse().slice(0, historyFilter);
+  const hasConfig = Boolean(
+    sensorData?.has_config ?? sensorData?.config ?? configReady
+  );
 
   const alerts = [];
-  if (sensorData) {
+  if (sensorData && hasConfig) {
     if (sensorData.do_am_dat < thresholds.minSoil) {
       alerts.push('Đất đang khô, cần tưới');
     }
@@ -125,236 +415,232 @@ function App() {
   }
 
   useEffect(() => {
-    if (alerts.length > 0) {
+    if (alerts.length > 0 && hasConfig) {
       setToast({ type: 'warning', message: alerts[0] });
     }
-  }, [alerts.length]);
+  }, [alerts.length, hasConfig]);
 
-  const gardenStatus = sensorData?.garden_status || '---';
-  const autoMode = sensorData?.auto_mode || '---';
-  const pumpStatus = sensorData?.trang_thai_bom || '---';
+  const gardenStatus = (() => {
+    if (sensorData?.garden_status) return sensorData.garden_status;
+    if (!sensorData) return '---';
+    if (!hasConfig) return 'CHUA_CAU_HINH';
+
+    const soil = sensorData.do_am_dat;
+    const temp = sensorData.nhiet_do;
+    const humi = sensorData.do_am_khong_khi;
+
+    if (
+      typeof soil !== 'number' ||
+      typeof temp !== 'number' ||
+      typeof humi !== 'number' ||
+      Number.isNaN(soil) ||
+      Number.isNaN(temp) ||
+      Number.isNaN(humi)
+    ) {
+      return '---';
+    }
+
+    let status = 'TOT';
+    if (soil < thresholds.minSoil || temp > thresholds.maxTemp || humi < thresholds.minAirHum) {
+      status = 'CAN_CHU_Y';
+    }
+    if (
+      soil < thresholds.minSoil - 10 ||
+      temp > thresholds.maxTemp + 5 ||
+      humi < thresholds.minAirHum - 10
+    ) {
+      status = 'NGUY_HIEM';
+    }
+    return status;
+  })();
+
+  const autoMode = (() => {
+    if (sensorData?.auto === true) return 'BAT';
+    if (sensorData?.auto === false) return 'TAT';
+    return sensorData?.auto_mode || '---';
+  })();
+  const pumpStatus =
+    sensorData?.trang_thai_bom ??
+    (sensorData?.pump === true
+      ? 'DANG_TUOI'
+      : sensorData?.pump === false
+        ? 'KHONG_TUOI'
+        : '---');
   const gardenStatusLabelMap = {
     TOT: 'Tốt',
     CAN_CHU_Y: 'Cần chú ý',
     NGUY_HIEM: 'Nguy hiểm',
-  };
-  const autoModeLabelMap = {
-    BAT: 'Bật',
-    TAT: 'Tắt',
   };
   const pumpStatusLabelMap = {
     DANG_TUOI: 'Đang tưới',
     KHONG_TUOI: 'Không tưới',
   };
   const gardenStatusLabel = gardenStatusLabelMap[gardenStatus] || gardenStatus;
-  const autoModeLabel = autoModeLabelMap[autoMode] || autoMode;
   const pumpStatusLabel = pumpStatusLabelMap[pumpStatus] || pumpStatus;
   const gardenStatusClass = typeof gardenStatus === 'string'
     ? gardenStatus.toLowerCase()
     : 'muted';
 
+  const needsWatering = Boolean(
+    hasConfig && sensorData && sensorData.do_am_dat < thresholds.minSoil
+  );
+
+  useEffect(() => {
+    console.log('[iot] Cấu hình ngưỡng hiện tại:', thresholds);
+  }, [thresholds]);
+
+  useEffect(() => {
+    if (!sensorData) return;
+    if (configReady) {
+      console.log('[iot] Tình trạng vườn hiện tại:', {
+        tinhTrangVuon: gardenStatus,
+        cheDo: autoMode,
+        trangThaiBom: pumpStatus,
+        canTuoi: needsWatering,
+      });
+    }
+    console.log('[iot] Thông số vườn hiện tại:', {
+      nhietDo: sensorData.nhiet_do ?? '--',
+      doAmKhongKhi: sensorData.do_am_khong_khi ?? '--',
+      doAmDat: sensorData.do_am_dat ?? '--',
+      anhSang: sensorData.anh_sang ?? '--',
+      mucNuoc: sensorData.muc_nuoc ?? '--',
+      thoiGian: sensorData.time ?? '--',
+    });
+  }, [sensorData, gardenStatus, autoMode, pumpStatus, needsWatering, configReady]);
+
   return (
-    <div className="app">
-      {/* Header */}
-      <header className="app-header">
-        <div className="header-left">
-          <h1>📊 IoT Dashboard</h1>
-          <span className="header-subtitle">ESP32 Sensor Monitor</span>
-        </div>
-        <div className={`connection-badge ${currentStatus.cls}`}>
-          {currentStatus.text}
-        </div>
-      </header>
-
-      {/* Main content */}
-      <main className="app-main">
-        {alerts.length > 0 && (
-          <section className="section alert-banner">
-            <div className="alert-title">Cảnh báo môi trường</div>
-            <div className="alert-list">
-              {alerts.map((item, index) => (
-                <span className="alert-item" key={`${item}-${index}`}>
-                  {item}
-                </span>
-              ))}
+    <BrowserRouter>
+      <div className="app">
+        <header className="app-header">
+          <div className="header-left">
+            <h1>📊 IoT Dashboard</h1>
+            <span className="header-subtitle">ESP32 Sensor Monitor</span>
+          </div>
+          <div className="header-actions">
+            <nav className="nav-links">
+              <Link to="/">Dashboard</Link>
+              <Link to="/admin">Admin</Link>
+            </nav>
+            <div className="user-badge">
+              {authUser ? (
+                <>
+                  <span className={`role-pill ${role}`}>{role || 'viewer'}</span>
+                  <span className="user-email">{authUser.email}</span>
+                  <button className="btn-ghost" onClick={handleSignOut}>
+                    Đăng xuất
+                  </button>
+                </>
+              ) : (
+                <Link className="btn-ghost" to="/dang-nhap">
+                  Đăng nhập
+                </Link>
+              )}
             </div>
-          </section>
-        )}
-
-        <section className="section status-section">
-          <div className="status-card">
-            <div className="status-label">Tình trạng vườn</div>
-            <div className={`status-value ${gardenStatusClass}`}>
-              {gardenStatusLabel}
+            <div className={`connection-badge ${currentStatus.cls}`}>
+              {currentStatus.text}
             </div>
           </div>
-          <div className="status-card">
-            <div className="status-label">Chế độ</div>
-            <div className={`status-value ${autoMode === 'BAT' ? 'ok' : 'warn'}`}>
-              {autoModeLabel}
-            </div>
-          </div>
-          <div className="status-card">
-            <div className="status-label">Trạng thái bơm</div>
-            <div className={`status-value ${pumpStatus === 'DANG_TUOI' ? 'ok' : 'muted'}`}>
-              {pumpStatusLabel}
-            </div>
-          </div>
-        </section>
+        </header>
 
-        {/* Sensor Cards */}
-        <section className="section">
-          <SensorCard sensorData={sensorData} connected={connected} />
-        </section>
-
-        {/* Controls */}
-        <section className="section">
-          <ControlButtons
-            connected={connected}
-            autoMode={autoMode}
-            pumpStatus={pumpStatus}
-          />
-        </section>
-
-        {/* Chart */}
-        <section className="section">
-          <SensorChart history={history} />
-        </section>
-
-        <section className="section settings-section">
-          <div className="settings-header">
-            <h3>⚙️ Thiết lập ngưỡng</h3>
-            <button className="btn-save" onClick={saveThresholds}>
-              Lưu & Gửi ESP32
-            </button>
-          </div>
-          <div className="settings-grid">
-            <label className="setting-field">
-              <span>Độ ẩm đất tối thiểu (%)</span>
-              <input
-                type="number"
-                value={thresholds.minSoil}
-                onChange={(e) => updateThreshold('minSoil', Number(e.target.value))}
-              />
-            </label>
-            <label className="setting-field">
-              <span>Mức độ ẩm đất mục tiêu (%)</span>
-              <input
-                type="number"
-                value={thresholds.targetSoil}
-                onChange={(e) => updateThreshold('targetSoil', Number(e.target.value))}
-              />
-            </label>
-            <label className="setting-field">
-              <span>Nhiệt độ tối đa (°C)</span>
-              <input
-                type="number"
-                value={thresholds.maxTemp}
-                onChange={(e) => updateThreshold('maxTemp', Number(e.target.value))}
-              />
-            </label>
-            <label className="setting-field">
-              <span>Độ ẩm KK tối thiểu (%)</span>
-              <input
-                type="number"
-                value={thresholds.minAirHum}
-                onChange={(e) => updateThreshold('minAirHum', Number(e.target.value))}
-              />
-            </label>
-            <label className="setting-field">
-              <span>Cường độ ánh sáng tối đa (lux)</span>
-              <input
-                type="number"
-                value={thresholds.maxLux}
-                onChange={(e) => updateThreshold('maxLux', Number(e.target.value))}
-              />
-            </label>
-            <label className="setting-field">
-              <span>Khoảng cách mực nước tối đa (cm)</span>
-              <input
-                type="number"
-                value={thresholds.maxWaterDistance}
-                onChange={(e) => updateThreshold('maxWaterDistance', Number(e.target.value))}
-              />
-            </label>
-          </div>
-        </section>
-
-        {/* History Table */}
-        <section className="section history-section">
-          <div className="history-header">
-            <h3>🗂️ Lịch sử dữ liệu</h3>
-            <div className="history-controls">
-              <select
-                className="history-filter"
-                value={historyFilter}
-                onChange={(e) => setHistoryFilter(Number(e.target.value))}
-              >
-                <option value={10}>10 bản ghi gần nhất</option>
-                <option value={20}>20 bản ghi gần nhất</option>
-                <option value={50}>50 bản ghi gần nhất</option>
-              </select>
-              <button className="btn-clear" onClick={clearHistory}>
-                🗑️ Xóa lịch sử
-              </button>
-            </div>
-          </div>
-
-          <div className="table-wrapper">
-            <table className="history-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Thời gian</th>
-                  <th>🌡️ Nhiệt độ (°C)</th>
-                  <th>💧 Độ ẩm KK (%)</th>
-                  <th>🌱 Độ ẩm đất (%)</th>
-                  <th>💡 Ánh sáng (lux)</th>
-                  <th>🌊 Mực nước (cm)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedHistory.length > 0 ? (
-                  displayedHistory.map((row, i) => (
-                    <tr key={i}>
-                      <td className="row-num">{history.length - i}</td>
-                      <td>{row.time}</td>
-                      <td style={{ color: '#ff6b6b' }}>{row.nhiet_do ?? '--'}</td>
-                      <td style={{ color: '#4dabf7' }}>{row.do_am_khong_khi ?? '--'}</td>
-                      <td style={{ color: '#51cf66' }}>{row.do_am_dat ?? '--'}</td>
-                      <td style={{ color: '#ffa94d' }}>{row.anh_sang ?? '--'}</td>
-                      <td style={{ color: '#ffd43b' }}>{row.muc_nuoc ?? '--'}</td>
-                    </tr>
-                  ))
+        <main className="app-main">
+          <Routes>
+            <Route
+              path="/dang-nhap"
+              element={<LoginPage onSignIn={handleSignIn} authError={authError} />}
+            />
+            <Route
+              path="/dang-ky"
+              element={<RegisterPage onSignUp={handleSignUp} authError={authError} />}
+            />
+            <Route
+              path="/admin"
+              element={
+                canEdit ? (
+                  <AdminPage
+                    users={users}
+                    roles={roles}
+                    onSetRole={handleSetRole}
+                    authUser={authUser}
+                  />
                 ) : (
-                  <tr>
-                    <td colSpan={7} className="no-data">
-                      📡 Chưa có dữ liệu — đang chờ tín hiệu từ ESP32...
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  <Navigate to="/dang-nhap" replace />
+                )
+              }
+            />
+            <Route
+              path="/"
+              element={
+                <>
+                  <div className="tab-bar">
+                    <button
+                      className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('dashboard')}
+                    >
+                      Dashboard cảm biến
+                    </button>
+                    <button
+                      className={`tab-btn ${activeTab === 'config' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('config')}
+                    >
+                      Cấu hình cây trồng
+                    </button>
+                  </div>
+
+                  {activeTab === 'dashboard' ? (
+                    <DashboardPage
+                      alerts={alerts}
+                      configReady={configReady}
+                      sensorData={sensorData}
+                      connected={connected}
+                      gardenStatusLabel={gardenStatusLabel}
+                      gardenStatusClass={gardenStatusClass}
+                      autoMode={autoMode}
+                      pumpStatus={pumpStatus}
+                      pumpStatusLabel={pumpStatusLabel}
+                      needsWatering={needsWatering}
+                      history={history}
+                      historyFilter={historyFilter}
+                      onHistoryFilterChange={(value) => setHistoryFilter(value)}
+                      historyDate={historyDate}
+                      onHistoryDateChange={(value) => setHistoryDate(value)}
+                      onClearHistory={clearHistory}
+                      canControl={canControl}
+                    />
+                  ) : (
+                    <ConfigPage
+                      presets={presets}
+                      selectedPreset={selectedPreset}
+                      configReady={configReady}
+                      thresholds={thresholds}
+                      sensorData={sensorData}
+                      onSelectPreset={applyPreset}
+                      onChangeThreshold={updateThreshold}
+                      onSave={saveThresholds}
+                      onAddPreset={addPreset}
+                      onUpdatePreset={updatePreset}
+                      onDeletePreset={deletePreset}
+                      canEdit={canEdit}
+                    />
+                  )}
+                </>
+              }
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
+
+        <footer className="app-footer">
+          IoT Dashboard · ESP32 via MQTT · HiveMQ Cloud
+        </footer>
+
+        {toast && (
+          <div className={`toast ${toast.type}`}>
+            {toast.message}
           </div>
-
-          {history.length > 0 && (
-            <div className="history-footer">
-              Tổng: <strong>{history.length}</strong> bản ghi
-            </div>
-          )}
-        </section>
-      </main>
-
-      <footer className="app-footer">
-        IoT Dashboard · ESP32 via MQTT · HiveMQ Cloud
-      </footer>
-
-      {toast && (
-        <div className={`toast ${toast.type}`}>
-          {toast.message}
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </BrowserRouter>
   );
 }
 

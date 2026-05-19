@@ -8,12 +8,15 @@ export const SENSOR_KEYS = [
   { key: 'muc_nuoc', label: 'Mực nước (cm)', color: '#ffd43b' },
 ];
 
-export function addToHistory(prevHistory, newData) {
-  const timestamp = new Date().toLocaleTimeString('vi-VN', {
+const formatTime = (ts) =>
+  new Date(ts).toLocaleTimeString('vi-VN', {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
   });
+
+export function addToHistory(prevHistory, newData) {
+  const timestamp = formatTime(Date.now());
 
   const entry = {
     time: timestamp,
@@ -29,6 +32,27 @@ export function addToHistory(prevHistory, newData) {
     return updated.slice(updated.length - MAX_HISTORY);
   }
   return updated;
+}
+
+export function buildHistoryFromFirebase(historyData) {
+  if (!historyData || typeof historyData !== 'object') return [];
+
+  const entries = Object.values(historyData)
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => {
+      const ts = item.ts || Date.now();
+      return {
+        ts,
+        time: formatTime(ts),
+        nhiet_do: item.nhiet_do ?? item.temp ?? null,
+        do_am_khong_khi: item.do_am_khong_khi ?? item.humi ?? null,
+        do_am_dat: item.do_am_dat ?? item.soil ?? null,
+        anh_sang: item.anh_sang ?? item.lux ?? null,
+        muc_nuoc: item.muc_nuoc ?? item.distance ?? null,
+      };
+    });
+
+  return entries.sort((a, b) => a.ts - b.ts).slice(-MAX_HISTORY);
 }
 
 export function getChartData(history) {
