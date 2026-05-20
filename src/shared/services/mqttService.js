@@ -1,10 +1,14 @@
 import mqtt from 'mqtt';
 
-const MQTT_URL = 'wss://916cc55df8ed4fa2bfff8e4d25fd0f56.s1.eu.hivemq.cloud:8884/mqtt';
+const MQTT_URL =
+  process.env.REACT_APP_MQTT_URL ||
+  'wss://916cc55df8ed4fa2bfff8e4d25fd0f56.s1.eu.hivemq.cloud:8884/mqtt';
 const MQTT_OPTIONS = {
-  username: 'location',
-  password: 'Abc12345',
-  clientId: `iot_web_${Math.random().toString(16).slice(2, 10)}`,
+  username: process.env.REACT_APP_MQTT_USERNAME || 'location',
+  password: process.env.REACT_APP_MQTT_PASSWORD || 'Abc12345',
+  clientId:
+    process.env.REACT_APP_MQTT_CLIENT_ID ||
+    `iot_web_${Math.random().toString(16).slice(2, 10)}`,
   clean: true,
   reconnectPeriod: 3000,
   connectTimeout: 10000,

@@ -16,17 +16,25 @@ import {
 } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyCR5BxrCoh0n88EcYKbN0rZe1j5Eq3GUtY',
-  authDomain: 'smart-garden-eace0.firebaseapp.com',
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY || 'AIzaSyCR5BxrCoh0n88EcYKbN0rZe1j5Eq3GUtY',
+  authDomain:
+    process.env.REACT_APP_FIREBASE_AUTH_DOMAIN ||
+    'smart-garden-eace0.firebaseapp.com',
   databaseURL:
+    process.env.REACT_APP_FIREBASE_DB_URL ||
     'https://smart-garden-eace0-default-rtdb.asia-southeast1.firebasedatabase.app',
-  projectId: 'smart-garden-eace0',
-  storageBucket: 'smart-garden-eace0.firebasestorage.app',
-  messagingSenderId: '150795132598',
-  appId: '1:150795132598:web:8a85b66faa8892de845017',
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID || 'smart-garden-eace0',
+  storageBucket:
+    process.env.REACT_APP_FIREBASE_STORAGE_BUCKET ||
+    'smart-garden-eace0.firebasestorage.app',
+  messagingSenderId:
+    process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID || '150795132598',
+  appId:
+    process.env.REACT_APP_FIREBASE_APP_ID ||
+    '1:150795132598:web:8a85b66faa8892de845017',
 };
 
-const DEVICE_ID = 'esp32_01';
+const DEVICE_ID = process.env.REACT_APP_DEVICE_ID || 'esp32_01';
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
