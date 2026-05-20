@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const mqtt = require('mqtt');
 const express = require('express');
 const http = require('http');
@@ -6,14 +8,21 @@ const path = require('path');
 const admin = require('firebase-admin');
 
 // ===== MQTT CONFIG =====
-const MQTT_URL = 'mqtts://916cc55df8ed4fa2bfff8e4d25fd0f56.s1.eu.hivemq.cloud:8883';
+const MQTT_URL = process.env.MQTT_URL;
 const MQTT_OPTIONS = {
-  username: 'location',
-  password: 'Abc12345',
-  clientId: `iot_server_${Math.random().toString(16).slice(2, 10)}`,
+  username: process.env.MQTT_USERNAME,
+  password: process.env.MQTT_PASSWORD,
+  clientId:
+    process.env.MQTT_CLIENT_ID ||
+    `iot_server_${Math.random().toString(16).slice(2, 10)}`,
   clean: true,
   reconnectPeriod: 3000,
 };
+
+if (!MQTT_URL) {
+  console.error('[MQTT] Missing MQTT_URL. Set it in environment variables.');
+  process.exit(1);
+}
 
 const TOPICS = {
   SENSOR: 'esp32/sensor',
@@ -118,9 +127,13 @@ const writeConfigToFirebase = async (config) => {
 // ===== EXPRESS + SOCKET.IO =====
 const app = express();
 const server = http.createServer(app);
+const corsOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
+  : '*';
+
 const io = new Server(server, {
   cors: {
-    origin: '*',
+    origin: corsOrigins,
     methods: ['GET', 'POST'],
   },
 });
