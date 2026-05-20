@@ -40,6 +40,8 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
+console.log('[Firebase] Khoi tao thanh cong');
+
 const withDevicePath = (path) => `devices/${DEVICE_ID}/${path}`;
 
 export const firebaseService = {
@@ -68,32 +70,41 @@ export const firebaseService = {
     return signOut(auth);
   },
 
-  subscribeLatest(callback) {
+  subscribeLatest(callback, onError) {
     const latestRef = ref(db, withDevicePath('latest'));
     const handler = (snapshot) => {
       const value = snapshot.val();
-      if (value) callback(value);
+      callback(value || null);
     };
-    onValue(latestRef, handler);
+    onValue(latestRef, handler, (err) => {
+      console.error('[Firebase] Subscribe latest error:', err);
+      if (onError) onError(err);
+    });
     return () => off(latestRef, 'value', handler);
   },
 
-  subscribeHistory(dateKey, callback) {
+  subscribeHistory(dateKey, callback, onError) {
     const historyRef = ref(db, withDevicePath(`history/${dateKey}`));
     const handler = (snapshot) => {
       callback(snapshot.val() || {});
     };
-    onValue(historyRef, handler);
+    onValue(historyRef, handler, (err) => {
+      console.error('[Firebase] Subscribe history error:', err);
+      if (onError) onError(err);
+    });
     return () => off(historyRef, 'value', handler);
   },
 
-  subscribeConfig(callback) {
+  subscribeConfig(callback, onError) {
     const configRef = ref(db, withDevicePath('config'));
     const handler = (snapshot) => {
       const value = snapshot.val();
       if (value) callback(value);
     };
-    onValue(configRef, handler);
+    onValue(configRef, handler, (err) => {
+      console.error('[Firebase] Subscribe config error:', err);
+      if (onError) onError(err);
+    });
     return () => off(configRef, 'value', handler);
   },
 
@@ -139,12 +150,15 @@ export const firebaseService = {
     await set(roleRef, nextRole);
   },
 
-  subscribePresets(callback) {
+  subscribePresets(callback, onError) {
     const presetsRef = ref(db, withDevicePath('presets'));
     const handler = (snapshot) => {
       callback(snapshot.val() || {});
     };
-    onValue(presetsRef, handler);
+    onValue(presetsRef, handler, (err) => {
+      console.error('[Firebase] Subscribe presets error:', err);
+      if (onError) onError(err);
+    });
     return () => off(presetsRef, 'value', handler);
   },
 

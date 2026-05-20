@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import './App.css';
 
@@ -109,11 +109,20 @@ const toPresetKey = (name) =>
     .replace(/\s+/g, '_')
     .replace(/_+/g, '_');
 
+const maskEnvValue = (value) => {
+  if (!value) return '(empty)';
+  if (value.length <= 6) return '***';
+  return `${value.slice(0, 3)}***${value.slice(-2)}`;
+};
+
 function App() {
   const [sensorData, setSensorData] = useState(null);
   const [history, setHistory] = useState([]);
   const [connected, setConnected] = useState(false);
   const [mqttStatus, setMqttStatus] = useState('connecting');
+  const [latestLoaded, setLatestLoaded] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [presetsLoaded, setPresetsLoaded] = useState(false);
   const [historyFilter, setHistoryFilter] = useState(20);
   const [historyDate, setHistoryDate] = useState(() =>
     new Date().toISOString().slice(0, 10)
@@ -149,8 +158,31 @@ function App() {
   const canEdit = role === 'admin';
   const canControl = role === 'admin';
 
+  useEffect(() => {
+    const envSnapshot = {
+      REACT_APP_API_URL: process.env.REACT_APP_API_URL || '(empty)',
+      REACT_APP_MQTT_URL: process.env.REACT_APP_MQTT_URL || '(empty)',
+      REACT_APP_MQTT_USERNAME: process.env.REACT_APP_MQTT_USERNAME || '(empty)',
+      REACT_APP_MQTT_PASSWORD: maskEnvValue(process.env.REACT_APP_MQTT_PASSWORD),
+      REACT_APP_MQTT_CLIENT_ID: process.env.REACT_APP_MQTT_CLIENT_ID || '(empty)',
+      REACT_APP_FIREBASE_API_KEY: maskEnvValue(process.env.REACT_APP_FIREBASE_API_KEY),
+      REACT_APP_FIREBASE_AUTH_DOMAIN:
+        process.env.REACT_APP_FIREBASE_AUTH_DOMAIN || '(empty)',
+      REACT_APP_FIREBASE_DB_URL: process.env.REACT_APP_FIREBASE_DB_URL || '(empty)',
+      REACT_APP_FIREBASE_PROJECT_ID:
+        process.env.REACT_APP_FIREBASE_PROJECT_ID || '(empty)',
+      REACT_APP_FIREBASE_STORAGE_BUCKET:
+        process.env.REACT_APP_FIREBASE_STORAGE_BUCKET || '(empty)',
+      REACT_APP_FIREBASE_MESSAGING_SENDER_ID:
+        process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID || '(empty)',
+      REACT_APP_FIREBASE_APP_ID: maskEnvValue(process.env.REACT_APP_FIREBASE_APP_ID),
+      REACT_APP_DEVICE_ID: process.env.REACT_APP_DEVICE_ID || '(empty)',
+    };
+    console.log('[Env] Thong tin bien moi truong:', envSnapshot);
+  }, []);
+
   const handleSensor = useCallback((data) => {
-    setSensorData(data);
+    setSensorData(data || null);
   }, []);
 
   const handleConnect = useCallback((status) => {
@@ -173,15 +205,27 @@ function App() {
   }, [handleSensor, handleConnect, handleStatus]);
 
   useEffect(() => {
-    const unsubscribeLatest = firebaseService.subscribeLatest(handleSensor);
+    const unsubscribeLatest = firebaseService.subscribeLatest((data) => {
+      setLatestLoaded(true);
+      handleSensor(data);
+    }, () => {
+      setLatestLoaded(true);
+      setToast({ type: 'warning', message: 'Không thể tải dữ liệu Firebase.' });
+    });
     return () => unsubscribeLatest();
   }, [handleSensor]);
 
   useEffect(() => {
+    setHistoryLoaded(false);
     const unsubscribeHistory = firebaseService.subscribeHistory(
       historyDate,
       (data) => {
+        setHistoryLoaded(true);
         setHistory(buildHistoryFromFirebase(data));
+      },
+      () => {
+        setHistoryLoaded(true);
+        setToast({ type: 'warning', message: 'Không thể tải lịch sử Firebase.' });
       }
     );
     return () => unsubscribeHistory();
@@ -189,6 +233,7 @@ function App() {
 
   useEffect(() => {
     const unsubscribePresets = firebaseService.subscribePresets((data) => {
+      setPresetsLoaded(true);
       const entries = Object.entries(data || {}).map(([key, value]) => ({
         key,
         name: value.name,
@@ -197,6 +242,9 @@ function App() {
       }));
       setCustomPresets(entries);
       saveCustomPresets(entries);
+    }, () => {
+      setPresetsLoaded(true);
+      setToast({ type: 'warning', message: 'Không thể tải preset từ Firebase.' });
     });
 
     return () => unsubscribePresets();
@@ -322,7 +370,6 @@ function App() {
       key = `${baseKey}_${suffix}`;
       suffix += 1;
     }
-    const newPreset = { key, name: trimmed, config: { ...config }, isCustom: true };
     firebaseService.savePreset(key, { name: trimmed, config: { ...config } });
     setSelectedPreset(key);
     setToast({ type: 'success', message: `Đã thêm preset: ${trimmed}` });
@@ -391,34 +438,44 @@ function App() {
   };
   const currentStatus = statusLabel[mqttStatus] || statusLabel.connecting;
 
+  const isMqttConnecting = mqttStatus === 'connecting' || mqttStatus === 'reconnecting';
+  const isFirebaseLoading = !historyLoaded || !presetsLoaded || !latestLoaded;
+  const showLoading = isMqttConnecting || isFirebaseLoading;
+  const loadingMessages = [];
+  if (isMqttConnecting) loadingMessages.push('Dang ket noi MQTT...');
+  if (isFirebaseLoading) loadingMessages.push('Dang tai du lieu Firebase...');
+
   const hasConfig = Boolean(
     sensorData?.has_config ?? sensorData?.config ?? configReady
   );
 
-  const alerts = [];
-  if (sensorData && hasConfig) {
-    if (sensorData.do_am_dat < thresholds.minSoil) {
-      alerts.push('Đất đang khô, cần tưới');
+  const alerts = useMemo(() => {
+    const nextAlerts = [];
+    if (sensorData && hasConfig) {
+      if (sensorData.do_am_dat < thresholds.minSoil) {
+        nextAlerts.push('Đất đang khô, cần tưới');
+      }
+      if (sensorData.nhiet_do > thresholds.maxTemp) {
+        nextAlerts.push('Nhiệt độ cao');
+      }
+      if (sensorData.do_am_khong_khi < thresholds.minAirHum) {
+        nextAlerts.push('Không khí khô');
+      }
+      if (sensorData.anh_sang > thresholds.maxLux) {
+        nextAlerts.push('Ánh sáng quá mạnh');
+      }
+      if (sensorData.muc_nuoc > thresholds.maxWaterDistance) {
+        nextAlerts.push('Cảnh báo: mực nước thấp');
+      }
     }
-    if (sensorData.nhiet_do > thresholds.maxTemp) {
-      alerts.push('Nhiệt độ cao');
-    }
-    if (sensorData.do_am_khong_khi < thresholds.minAirHum) {
-      alerts.push('Không khí khô');
-    }
-    if (sensorData.anh_sang > thresholds.maxLux) {
-      alerts.push('Ánh sáng quá mạnh');
-    }
-    if (sensorData.muc_nuoc > thresholds.maxWaterDistance) {
-      alerts.push('Cảnh báo: mực nước thấp');
-    }
-  }
+    return nextAlerts;
+  }, [sensorData, hasConfig, thresholds]);
 
   useEffect(() => {
     if (alerts.length > 0 && hasConfig) {
       setToast({ type: 'warning', message: alerts[0] });
     }
-  }, [alerts.length, hasConfig]);
+  }, [alerts, hasConfig]);
 
   const gardenStatus = (() => {
     if (sensorData?.garden_status) return sensorData.garden_status;
@@ -512,6 +569,17 @@ function App() {
   return (
     <BrowserRouter>
       <div className="app">
+        {showLoading && (
+          <div className="loading-overlay" aria-live="polite">
+            <div className="loading-card">
+              <div className="loading-spinner" />
+              <div className="loading-title">Đang kết nối hệ thống</div>
+              <div className="loading-subtitle">
+                {loadingMessages.join(' ')}
+              </div>
+            </div>
+          </div>
+        )}
         <header className="app-header">
           <div className="header-left">
             <h1>📊 IoT Dashboard</h1>
@@ -519,7 +587,7 @@ function App() {
           </div>
           <div className="header-actions">
             <nav className="nav-links">
-              <Link to="/">Dashboard</Link>
+              <Link to="/dashboard">Dashboard</Link>
               <Link to="/admin">Admin</Link>
             </nav>
             <div className="user-badge">
@@ -570,60 +638,68 @@ function App() {
             />
             <Route
               path="/"
+              element={<Navigate to={authUser ? '/dashboard' : '/dang-nhap'} replace />}
+            />
+            <Route
+              path="/dashboard"
               element={
-                <>
-                  <div className="tab-bar">
-                    <button
-                      className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
-                      onClick={() => setActiveTab('dashboard')}
-                    >
-                      Dashboard cảm biến
-                    </button>
-                    <button
-                      className={`tab-btn ${activeTab === 'config' ? 'active' : ''}`}
-                      onClick={() => setActiveTab('config')}
-                    >
-                      Cấu hình cây trồng
-                    </button>
-                  </div>
+                authUser ? (
+                  <>
+                    <div className="tab-bar">
+                      <button
+                        className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('dashboard')}
+                      >
+                        Dashboard cảm biến
+                      </button>
+                      <button
+                        className={`tab-btn ${activeTab === 'config' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('config')}
+                      >
+                        Cấu hình cây trồng
+                      </button>
+                    </div>
 
-                  {activeTab === 'dashboard' ? (
-                    <DashboardPage
-                      alerts={alerts}
-                      configReady={configReady}
-                      sensorData={sensorData}
-                      connected={connected}
-                      gardenStatusLabel={gardenStatusLabel}
-                      gardenStatusClass={gardenStatusClass}
-                      autoMode={autoMode}
-                      pumpStatus={pumpStatus}
-                      pumpStatusLabel={pumpStatusLabel}
-                      needsWatering={needsWatering}
-                      history={history}
-                      historyFilter={historyFilter}
-                      onHistoryFilterChange={(value) => setHistoryFilter(value)}
-                      historyDate={historyDate}
-                      onHistoryDateChange={(value) => setHistoryDate(value)}
-                      onClearHistory={clearHistory}
-                      canControl={canControl}
-                    />
-                  ) : (
-                    <ConfigPage
-                      presets={presets}
-                      selectedPreset={selectedPreset}
-                      configReady={configReady}
-                      thresholds={thresholds}
-                      sensorData={sensorData}
-                      onSelectPreset={applyPreset}
-                      onChangeThreshold={updateThreshold}
-                      onSave={saveThresholds}
-                      onAddPreset={addPreset}
-                      onUpdatePreset={updatePreset}
-                      onDeletePreset={deletePreset}
-                      canEdit={canEdit}
-                    />
-                  )}
-                </>
+                    {activeTab === 'dashboard' ? (
+                      <DashboardPage
+                        alerts={alerts}
+                        configReady={configReady}
+                        sensorData={sensorData}
+                        connected={connected}
+                        gardenStatusLabel={gardenStatusLabel}
+                        gardenStatusClass={gardenStatusClass}
+                        autoMode={autoMode}
+                        pumpStatus={pumpStatus}
+                        pumpStatusLabel={pumpStatusLabel}
+                        needsWatering={needsWatering}
+                        history={history}
+                        historyFilter={historyFilter}
+                        onHistoryFilterChange={(value) => setHistoryFilter(value)}
+                        historyDate={historyDate}
+                        onHistoryDateChange={(value) => setHistoryDate(value)}
+                        onClearHistory={clearHistory}
+                        canControl={canControl}
+                      />
+                    ) : (
+                      <ConfigPage
+                        presets={presets}
+                        selectedPreset={selectedPreset}
+                        configReady={configReady}
+                        thresholds={thresholds}
+                        sensorData={sensorData}
+                        onSelectPreset={applyPreset}
+                        onChangeThreshold={updateThreshold}
+                        onSave={saveThresholds}
+                        onAddPreset={addPreset}
+                        onUpdatePreset={updatePreset}
+                        onDeletePreset={deletePreset}
+                        canEdit={canEdit}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <Navigate to="/dang-nhap" replace />
+                )
               }
             />
             <Route path="*" element={<Navigate to="/" replace />} />

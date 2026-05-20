@@ -71,7 +71,7 @@ class MqttService {
     this.client.on('connect', () => {
       this.connected = true;
       this.connecting = false;
-      console.log('[MQTT] Connected to HiveMQ');
+      console.log('[MQTT] Da ket noi HiveMQ');
       this.client.subscribe(TOPICS.SENSOR, (err) => {
         if (err) console.error('[MQTT] Subscribe error:', err);
         else console.log(`[MQTT] Subscribed to ${TOPICS.SENSOR}`);
@@ -92,17 +92,20 @@ class MqttService {
     });
 
     this.client.on('reconnect', () => {
+      console.log('[MQTT] Dang ket noi lai...');
       this._emit('status', 'reconnecting');
     });
 
     this.client.on('disconnect', () => {
       this.connected = false;
+      console.log('[MQTT] Mat ket noi');
       this._emit('connect', false);
       this._emit('status', 'disconnected');
     });
 
     this.client.on('offline', () => {
       this.connected = false;
+      console.log('[MQTT] Ngoai tuyen');
       this._emit('connect', false);
       this._emit('status', 'offline');
     });
@@ -120,10 +123,10 @@ class MqttService {
     if (this.client && this.connected) {
       this.client.publish(TOPICS.CONTROL, command, { qos: 1 }, (err) => {
         if (err) console.error('[MQTT] Publish error:', err);
-        else console.log(`[MQTT] Published to ${TOPICS.CONTROL}: ${command}`);
+        else console.log(`[MQTT] Da gui len ${TOPICS.CONTROL}: ${command}`);
       });
     } else {
-      console.warn('[MQTT] Cannot publish: not connected');
+      console.warn('[MQTT] Khong the gui: chua ket noi');
     }
   }
 
@@ -132,10 +135,10 @@ class MqttService {
       const payload = JSON.stringify(config);
       this.client.publish(TOPICS.CONFIG, payload, { qos: 1 }, (err) => {
         if (err) console.error('[MQTT] Publish config error:', err);
-        else console.log(`[MQTT] Published to ${TOPICS.CONFIG}: ${payload}`);
+        else console.log(`[MQTT] Da gui len ${TOPICS.CONFIG}: ${payload}`);
       });
     } else {
-      console.warn('[MQTT] Cannot publish config: not connected');
+      console.warn('[MQTT] Khong the gui config: chua ket noi');
     }
   }
 
