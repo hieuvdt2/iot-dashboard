@@ -133,6 +133,7 @@ function App() {
   const [selectedPreset, setSelectedPreset] = useState('');
   const [customPresets, setCustomPresets] = useState(() => loadCustomPresets());
   const [authUser, setAuthUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true); // chờ Firebase restore session
   const [role, setRole] = useState('viewer');
   const [authError, setAuthError] = useState('');
   const [users, setUsers] = useState({});
@@ -271,6 +272,7 @@ function App() {
     let roleUnsubscribe = null;
     const unsubscribe = firebaseService.onAuthStateChanged((user) => {
       setAuthUser(user);
+      setAuthLoading(false); // Firebase đã kiểm tra xong, cho phép render route
       setAuthError('');
       if (roleUnsubscribe) roleUnsubscribe();
       if (user) {
@@ -591,6 +593,29 @@ function App() {
     ? authUser.email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
     : 'Bạn';
 
+  /* Chờ Firebase kiểm tra session — tránh flash màn hình login */
+  if (authLoading) {
+    return (
+      <div style={{
+        height: '100vh', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+        gap: 16,
+      }}>
+        <div style={{
+          width: 48, height: 48, borderRadius: '50%',
+          border: '4px solid #e5e7eb',
+          borderTop: '4px solid #22c55e',
+          animation: 'spin 0.8s linear infinite',
+        }}/>
+        <div style={{ fontSize: '0.9rem', color: '#6b7280', fontWeight: 500 }}>
+          Đang khôi phục phiên đăng nhập...
+        </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
   return (
     <BrowserRouter>
       <div className="app">
@@ -719,6 +744,7 @@ function App() {
               <Route
                 path="/admin"
                 element={
+                  authLoading ? null :
                   canEdit ? (
                     <AdminPage
                       users={users}
@@ -733,11 +759,16 @@ function App() {
               />
               <Route
                 path="/"
-                element={<Navigate to={authUser ? '/dashboard' : '/dang-nhap'} replace />}
+                element={
+                  authLoading
+                    ? null
+                    : <Navigate to={authUser ? '/dashboard' : '/dang-nhap'} replace />
+                }
               />
               <Route
                 path="/dashboard"
                 element={
+                  authLoading ? null :
                   authUser ? (
                     activeTab === 'dashboard' ? (
                       <DashboardPage
@@ -784,12 +815,16 @@ function App() {
               <Route
                 path="/settings"
                 element={
+                  authLoading ? null :
                   authUser ? (
                     <div className="settings-panel">
                       <ControlButtons
                         connected={connected}
                         autoMode={autoMode}
                         pumpStatus={pumpStatus}
+                        manualSwitch={Boolean(sensorData?.manual_switch)}
+                        manualSwitchActive={Boolean(sensorData?.manual_switch_active)}
+                        pumpWebRequest={Boolean(sensorData?.pump_web_request)}
                         canControl={canControl}
                       />
 
@@ -832,7 +867,7 @@ function App() {
                           </div>
                           <div className="robot-figure">
                             <img
-                              src={`${process.env.PUBLIC_URL}/robot-ai.png`}
+                              src={`${process.env.PUBLIC_URL}/robot-garden.png`}
                               alt="Robot AI tưới cây"
                             />
                           </div>

@@ -741,17 +741,6 @@ function DashboardPage({
     ? 'Chưa có dữ liệu'
     : temp <= 25 ? 'Mát mẻ, lý tưởng' : temp <= (thresholds.maxTemp ?? 35) ? 'Phù hợp' : 'Hơi nóng';
 
-  /* Active sensors count */
-  const totalSensors = 5;
-  const activeSensors = [temp, airHum, soilHum, light, water].filter((v) => v !== null).length;
-  const activePct = Math.round((activeSensors / totalSensors) * 100);
-
-  /* Soil bar */
-  const soilPct = soilHum !== null ? Math.min(100, Math.max(0, soilHum)) : 0;
-  /* Light bar (normalize to maxLux) */
-  const lightPct = light !== null ? Math.min(100, Math.round((light / (thresholds.maxLux ?? 20000)) * 100)) : 0;
-  /* Water distance bar (inverse – smaller = better) */
-  const waterPct = water !== null ? Math.min(100, Math.max(0, 100 - Math.round((water / (thresholds.maxWaterDistance ?? 25)) * 100))) : 0;
   /* Pump */
   const pumpOn = pumpStatus === 'DANG_TUOI';
 
@@ -855,18 +844,37 @@ function DashboardPage({
 
       {/* ── BOTTOM ROW ── */}
       <div className="bottom-row">
-        {/* Active devices donut */}
-        <div className="active-devices-card">
-          <h3>Cảm biến hoạt động</h3>
-          <p>Đang dùng {activePct}% tổng công suất</p>
-          <div className="donut-wrap">
-            <DonutChart pct={activePct} size={140} stroke={14} color="#3db96e"/>
-            <div className="donut-label">
-              <div className="donut-num">{activeSensors}</div>
-              <div className="donut-pct">+{activePct}%</div>
+        {/* Pump status */}
+        <div className={`active-devices-card pump-status-card ${pumpOn ? 'pump-on' : 'pump-off'}`}>
+          <h3>Trạng thái máy bơm</h3>
+          <p>
+            {autoMode === 'BAT' ? 'Chế độ AUTO' : 'Chế độ thủ công'}
+            {pumpStatusLabel ? ` · ${pumpStatusLabel}` : ''}
+          </p>
+
+          <div className="pump-visual-wrap">
+            <div className="pump-icon-scene">
+              <img
+                src={`${process.env.PUBLIC_URL}/pump-icon.png`}
+                alt="Máy bơm"
+                className={`pump-icon-img ${pumpOn ? 'is-active' : 'is-idle'}`}
+              />
+              {pumpOn && (
+                <div className="pump-drops" aria-hidden="true">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <span
+                      key={i}
+                      className="water-drop"
+                      style={{ animationDelay: `${i * 0.22}s`, left: `${18 + i * 7}%` }}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
+            <p className={`pump-status-desc ${pumpOn ? 'active' : 'idle'}`}>
+              {pumpOn ? 'Máy bơm đang hoạt động' : 'Máy bơm đang tắt'}
+            </p>
           </div>
-          {/* Controls moved to Settings */}
         </div>
 
         {/* Chart */}

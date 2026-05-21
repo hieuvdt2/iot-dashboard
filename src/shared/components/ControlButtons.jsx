@@ -1,5 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { mqttService } from '../services/mqttService';
+
+const PENDING_LABELS = {
+  auto_on:  'Đang chuyển sang chế độ AUTO...',
+  auto_off: 'Đang chuyển sang chế độ thủ công...',
+  bat_bom:  'Đang bật máy bơm...',
+  tat_bom:  'Đang tắt máy bơm...',
+};
+
+const PENDING_TIMEOUT_MS = 10000;
+
+function isPendingFulfilled(command, autoMode, pumpStatus) {
+  if (!command) return true;
+  const isAuto = autoMode === 'BAT';
+  const isWatering = pumpStatus === 'DANG_TUOI';
+  switch (command) {
+    case 'auto_on':  return isAuto;
+    case 'auto_off': return !isAuto;
+    case 'bat_bom':  return isWatering;
+    case 'tat_bom':  return !isWatering;
+    default:         return true;
+  }
+}
 
 /* ════════════════════════════════════════════════════════
    PUMP SCENE — manual mode, shows tank → pipe → pump → plant
@@ -220,20 +242,9 @@ function PumpScene({ isWatering }) {
 ════════════════════════════════════════════════════════ */
 function AutoScene({ isWatering }) {
   return (
-    <div style={{
-      background: 'linear-gradient(135deg, #0f172a 0%, #0d2b1e 60%, #0f1c0a 100%)',
-      padding: '24px 32px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 0,
-      position: 'relative',
-      minHeight: 200,
-      overflow: 'hidden',
-    }}>
+    <div className="auto-scene-main">
       {/* Background grid */}
-      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.12 }}
-        xmlns="http://www.w3.org/2000/svg">
+      <svg className="auto-scene-grid" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
             <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#22c55e" strokeWidth="0.6" />
@@ -242,51 +253,20 @@ function AutoScene({ isWatering }) {
         <rect width="100%" height="100%" fill="url(#grid)" />
       </svg>
 
-      {/* Scan line animation */}
-      <div style={{
-        position: 'absolute', left: 0, right: 0,
-        height: 2,
-        background: 'linear-gradient(90deg, transparent, #22c55e44, #22c55e, #22c55e44, transparent)',
-        animation: 'scan-line 3s linear infinite',
-        opacity: 0.6,
-      }} />
+      <div className="auto-scene-scanline" />
 
       {/* ── ROBOT ── */}
-      <div style={{
-        position: 'relative',
-        flexShrink: 0,
-        animation: 'robot-float 3s ease-in-out infinite',
-      }}>
+      <div className="auto-scene-robot-wrap">
         <img
           src={`${process.env.PUBLIC_URL}/robot-garden.png`}
           alt="AI Robot"
-          style={{
-            width: 170,
-            height: 170,
-            objectFit: 'contain',
-            filter: 'drop-shadow(0 0 20px rgba(34,197,94,0.5)) drop-shadow(0 0 40px rgba(20,184,166,0.3))',
-          }}
+          className="auto-scene-robot-img"
         />
-        {/* glow shadow below */}
-        <div style={{
-          position: 'absolute', bottom: -6, left: '50%',
-          transform: 'translateX(-50%)',
-          width: 100, height: 14, borderRadius: '50%',
-          background: 'rgba(34,197,94,0.35)',
-          filter: 'blur(8px)',
-          animation: 'robot-float 3s ease-in-out infinite',
-        }} />
+        <div className="auto-scene-robot-glow" />
       </div>
 
       {/* ── CENTER CONNECTION ── */}
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        padding: '0 28px',
-        gap: 8,
-        flexShrink: 0,
-      }}>
+      <div className="auto-scene-center">
         {/* Status badge */}
         <div style={{
           background: 'rgba(34,197,94,0.15)',
@@ -355,7 +335,7 @@ function AutoScene({ isWatering }) {
       </div>
 
       {/* ── PLANT (watered by robot) ── */}
-      <div style={{ flexShrink: 0, position: 'relative' }}>
+      <div className="auto-scene-plant">
         <svg width="130" height="190" viewBox="0 0 130 190"
           xmlns="http://www.w3.org/2000/svg">
           <defs>
@@ -431,29 +411,73 @@ function AutoScene({ isWatering }) {
 /* ════════════════════════════════════════════════════════
    MAIN COMPONENT
 ════════════════════════════════════════════════════════ */
-function ControlButtons({ connected, autoMode, pumpStatus, canControl }) {
+function ControlButtons({ connected, autoMode, pumpStatus, manualSwitch, manualSwitchActive, pumpWebRequest, canControl }) {
   const [lastAction, setLastAction] = useState(null);
-  const [sending, setSending] = useState(false);
+  const [pendingCommand, setPendingCommand] = useState(null);
+  const [pendingError, setPendingError] = useState(null);
 
   const handleControl = (command, label) => {
-    if (!connected || sending || !canControl) return;
-    setSending(true);
+    if (!connected || pendingCommand || !canControl) return;
+    setPendingError(null);
+    setPendingCommand(command);
     mqttService.publishControl(command);
     setLastAction({ command, label, time: new Date().toLocaleTimeString('vi-VN') });
-    setTimeout(() => setSending(false), 1000);
   };
+
+  /* Clear loading khi MQTT xac nhan trang thai moi */
+  useEffect(() => {
+    if (!pendingCommand) return undefined;
+
+    if (isPendingFulfilled(pendingCommand, autoMode, pumpStatus)) {
+      setPendingCommand(null);
+      setPendingError(null);
+      return undefined;
+    }
+
+    const timeout = setTimeout(() => {
+      setPendingCommand(null);
+      setPendingError('Thiết bị chưa phản hồi. Vui lòng thử lại.');
+    }, PENDING_TIMEOUT_MS);
+
+    return () => clearTimeout(timeout);
+  }, [pendingCommand, autoMode, pumpStatus]);
 
   const isAuto     = autoMode === 'BAT';
   const isWatering = pumpStatus === 'DANG_TUOI';
+
+  const controlSource = (() => {
+    if (isAuto) {
+      if (manualSwitch) return 'Công tắc cơ đang BẬT (AUTO đang điều khiển bơm)';
+      return null;
+    }
+    if (manualSwitchActive) return 'Đang bật bởi công tắc cơ';
+    if (pumpWebRequest && isWatering) return 'Đang bật bởi web';
+    if (isWatering) return 'Máy bơm đang chạy';
+    if (manualSwitch && !isWatering) return 'Công tắc cơ BẬT — bơm đang tắt (chờ lệnh hoặc an toàn)';
+    return null;
+  })();
 
   const pumpCommand = isWatering ? 'tat_bom' : 'bat_bom';
   const pumpLabel   = isWatering ? 'Tắt bơm' : 'Bật bơm';
   const modeCommand = isAuto ? 'auto_off' : 'auto_on';
   const modeLabel   = isAuto ? 'Tắt AUTO' : 'Bật AUTO';
 
-  const disabled = !connected || sending || !canControl;
+  const isBusy = Boolean(pendingCommand);
+  const disabled = !connected || isBusy || !canControl;
+  const showPumpButton = !isAuto && !(isBusy && pendingCommand === 'auto_on');
 
-  /* button style helper */
+  const renderBtnContent = (command, icon, label) => {
+    if (pendingCommand === command) {
+      return (
+        <>
+          <span className="btn-spinner" aria-hidden="true" />
+          {PENDING_LABELS[command] || 'Đang gửi...'}
+        </>
+      );
+    }
+    return <>{icon} {label}</>;
+  };
+
   const btnStyle = ({ base, active }) => ({
     padding: '9px 18px',
     borderRadius: 9,
@@ -463,12 +487,14 @@ function ControlButtons({ connected, autoMode, pumpStatus, canControl }) {
     fontWeight: 700,
     fontSize: '0.83rem',
     cursor: disabled ? 'not-allowed' : 'pointer',
-    opacity: disabled ? 0.5 : 1,
+    opacity: disabled ? 0.55 : 1,
     display: 'flex',
     alignItems: 'center',
     gap: 7,
     transition: 'all 0.15s',
     letterSpacing: '-0.01em',
+    minWidth: pendingCommand ? 148 : undefined,
+    justifyContent: 'center',
   });
 
   return (
@@ -487,20 +513,41 @@ function ControlButtons({ connected, autoMode, pumpStatus, canControl }) {
         borderBottom: '1px solid #f3f4f6',
         flexWrap: 'wrap',
         gap: 10,
-        background: isAuto ? '#f0fdf4' : '#fff',
+        background: isBusy ? '#f8fafc' : (isAuto ? '#f0fdf4' : '#fff'),
       }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#111827', display: 'flex', alignItems: 'center', gap: 8 }}>
-            {isAuto
-              ? <><span>🤖</span> Chế độ tự động (AI)</>
-              : isWatering
-                ? <><span style={{ color: '#3b82f6' }}>💧</span> Đang bơm thủ công</>
-                : <><span>⏸</span> Hệ thống đang chờ</>
-            }
+            {isBusy ? (
+              <>
+                <span className="btn-spinner" aria-hidden="true" />
+                <span style={{ color: '#2563eb' }}>{PENDING_LABELS[pendingCommand]}</span>
+              </>
+            ) : isAuto ? (
+              <><span>🤖</span> Chế độ tự động (AI)</>
+            ) : isWatering ? (
+              <><span style={{ color: '#3b82f6' }}>💧</span> Đang bơm thủ công</>
+            ) : (
+              <><span>⏸</span> Hệ thống đang chờ</>
+            )}
           </div>
-          {lastAction && (
-            <div style={{ fontSize: '0.73rem', color: '#9ca3af', marginTop: 2 }}>
+          {controlSource && !isBusy && (
+            <div style={{ fontSize: '0.73rem', color: manualSwitchActive ? '#b45309' : '#64748b', marginTop: 2 }}>
+              {manualSwitchActive ? '🔌 ' : '🌐 '}{controlSource}
+            </div>
+          )}
+          {lastAction && !isBusy && (
+            <div style={{ fontSize: '0.73rem', color: '#9ca3af', marginTop: controlSource ? 2 : 2 }}>
               Lần cuối: <strong style={{ color: '#6b7280' }}>{lastAction.label}</strong> lúc {lastAction.time}
+            </div>
+          )}
+          {isBusy && (
+            <div style={{ fontSize: '0.73rem', color: '#64748b', marginTop: 2 }}>
+              Đang đợi thiết bị xác nhận qua MQTT...
+            </div>
+          )}
+          {pendingError && !isBusy && (
+            <div style={{ fontSize: '0.73rem', color: '#dc2626', marginTop: 2, fontWeight: 600 }}>
+              {pendingError}
             </div>
           )}
         </div>
@@ -511,27 +558,38 @@ function ControlButtons({ connected, autoMode, pumpStatus, canControl }) {
             style={btnStyle({ base: '#22c55e', active: isAuto })}
             onClick={() => handleControl(modeCommand, modeLabel)}
             disabled={disabled}
+            aria-busy={pendingCommand === modeCommand}
           >
-            🤖 {modeLabel}
+            {renderBtnContent(modeCommand, '🤖', modeLabel)}
           </button>
 
-          {!isAuto && (
+          {showPumpButton && (
             <button
               style={btnStyle({ base: '#3b82f6', active: isWatering })}
               onClick={() => handleControl(pumpCommand, pumpLabel)}
               disabled={disabled}
+              aria-busy={pendingCommand === pumpCommand}
             >
-              💧 {pumpLabel}
+              {renderBtnContent(pumpCommand, '💧', pumpLabel)}
             </button>
           )}
         </div>
       </div>
 
       {/* ── VISUAL SCENE ── */}
-      {isAuto
-        ? <AutoScene isWatering={isWatering} />
-        : <PumpScene isWatering={isWatering} />
-      }
+      <div className="control-scene-wrap">
+        {isBusy ? (
+          <div className="control-scene-loading" role="status" aria-live="polite">
+            <div className="control-scene-spinner" aria-hidden="true" />
+            <p className="control-scene-loading-title">{PENDING_LABELS[pendingCommand]}</p>
+            <p className="control-scene-loading-sub">Đang đợi ESP32 phản hồi trạng thái mới...</p>
+          </div>
+        ) : isAuto ? (
+          <AutoScene isWatering={isWatering} />
+        ) : (
+          <PumpScene isWatering={isWatering} />
+        )}
+      </div>
 
       {/* ── WARNINGS ── */}
       {(!connected || (!canControl && connected)) && (
