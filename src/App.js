@@ -170,7 +170,7 @@ function App() {
   const [deployedThresholds, setDeployedThresholds] = useState(loadStoredThresholds);
   const [draftThresholds, setDraftThresholds] = useState(loadStoredThresholds);
 
-  const presets = [...BASE_PRESETS, ...customPresets];
+  const presets = useMemo(() => [...BASE_PRESETS, ...customPresets], [customPresets]);
   const canEdit = role === 'admin';
   const canControl = role === 'admin';
 
