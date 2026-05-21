@@ -76,6 +76,21 @@ function GaugeArc({ value, displayValue, pct, unit, label, icon, color }) {
   );
 }
 
+/* ── Ngưỡng độ ẩm đất: minSoil = khô (cần tưới), targetSoil = dừng tưới AUTO ── */
+const SOIL_OVERWATER_WARN = 85;
+
+const isSoilMoistureOk = (soilHum, minSoil) => (
+  soilHum === null ? null : soilHum >= minSoil
+);
+
+const soilMoistureThresholdLabel = (minSoil) => `≥ ${minSoil}%`;
+
+const soilMoistureHealthPct = (soilHum, minSoil) => {
+  if (soilHum === null) return null;
+  if (soilHum >= minSoil) return 100;
+  return Math.round((soilHum / minSoil) * 60);
+};
+
 /* ══════════════════════════════════════════════════
    PLANT HEALTH PANEL
 ══════════════════════════════════════════════════ */
@@ -99,10 +114,7 @@ function PlantHealthPanel({ temp, airHum, soilHum, light, water, thresholds = {}
     : airHum >= 25 ? 50
     : 28;
 
-  const soilPct = soilHum === null ? null
-    : soilHum >= minSoil && soilHum <= targetSoil ? 100
-    : soilHum < minSoil ? Math.round((soilHum / minSoil) * 60)
-    : Math.round(100 - ((soilHum - targetSoil) / (100 - targetSoil)) * 55);
+  const soilPct = soilMoistureHealthPct(soilHum, minSoil);
 
   const lightPct = light === null ? null
     : light >= maxLux * 0.3 && light <= maxLux ? 100
@@ -150,14 +162,16 @@ function PlantHealthPanel({ temp, airHum, soilHum, light, water, thresholds = {}
   const tips = [];
   if (temp !== null && tempPct < 60)
     tips.push(temp > maxTemp ? `🌡️ Nhiệt độ cao (${temp}°C), cần thông thoáng hơn` : `🌡️ Nhiệt độ thấp (${temp}°C), kiểm tra môi trường`);
-  if (soilHum !== null && soilPct < 60)
-    tips.push(soilHum < minSoil ? `🌱 Đất đang khô (${soilHum}%), nên bổ sung nước` : `🌱 Đất quá ẩm (${soilHum}%), giảm tưới`);
+  if (soilHum !== null && soilHum < minSoil)
+    tips.push(`🌱 Đất đang khô (${soilHum}%), nên bổ sung nước`);
+  else if (soilHum !== null && soilHum > SOIL_OVERWATER_WARN)
+    tips.push(`🌱 Đất quá ẩm (${soilHum}%), giảm tưới`);
   if (airHum !== null && airPct < 55)
     tips.push(`💨 Độ ẩm không khí thấp (${airHum}%), có thể ảnh hưởng đến cây`);
   if (water !== null && waterPct < 40)
     tips.push(`💧 Mực nước bể thấp, nên bổ sung nước`);
   if (tips.length === 0)
-    tips.push('✅ Tất cả chỉ số trong ngưỡng an toàn — cây đang phát triển tốt!');
+    tips.push('✅ Tất cả chỉ số đạt chuẩn an toàn — cây đang phát triển tốt!');
 
   return (
     <div style={{
@@ -401,9 +415,10 @@ function BannerAnnotations({ temp, airHum, soilHum, light, water, thresholds = {
   const bottomItems = [
     {
       label: 'Độ ẩm đất', value: soilHum, unit: '%',
-      ideal: `${thresholds.minSoil ?? 35}–${thresholds.targetSoil ?? 65}%`, color: '#22c55e',
+      ideal: soilMoistureThresholdLabel(thresholds.minSoil ?? 35),
+      color: '#22c55e',
       bg: 'rgba(240,253,244,0.92)', icon: ICON_SOIL,
-      ok: soilHum === null ? null : soilHum >= (thresholds.minSoil ?? 35) && soilHum <= (thresholds.targetSoil ?? 65),
+      ok: isSoilMoistureOk(soilHum, thresholds.minSoil ?? 35),
     },
   ];
 
@@ -412,20 +427,19 @@ function BannerAnnotations({ temp, airHum, soilHum, light, water, thresholds = {
     {
       label: 'Nhiệt độ',
       current: temp, unit: '°C',
-      ideal: `≤ ${thresholds.maxTemp ?? 35}°C`,
+      threshold: `≤ ${thresholds.maxTemp ?? 35}°C`,
       ok: temp === null ? null : temp <= (thresholds.maxTemp ?? 35),
     },
     {
       label: 'Độ ẩm đất',
       current: soilHum, unit: '%',
-      ideal: `${thresholds.minSoil ?? 35}–${thresholds.targetSoil ?? 65}%`,
-      ok: soilHum === null ? null
-        : soilHum >= (thresholds.minSoil ?? 35) && soilHum <= (thresholds.targetSoil ?? 65),
+      threshold: soilMoistureThresholdLabel(thresholds.minSoil ?? 35),
+      ok: isSoilMoistureOk(soilHum, thresholds.minSoil ?? 35),
     },
     {
       label: 'Độ ẩm KK',
       current: airHum, unit: '%',
-      ideal: `≥ ${thresholds.minAirHum ?? 50}%`,
+      threshold: `≥ ${thresholds.minAirHum ?? 50}%`,
       ok: airHum === null ? null : airHum >= (thresholds.minAirHum ?? 50),
     },
   ];
@@ -512,7 +526,7 @@ function BannerAnnotations({ temp, airHum, soilHum, light, water, thresholds = {
           <div style={{ position: 'absolute', top: -3, left: '66%', width: 1.5, height: 7, background: `${warnColor}33` }}/>
         </div>
 
-        {/* Card ngưỡng */}
+        {/* Card tiêu chuẩn cây trồng */}
         <div style={{
           background: warnBg,
           backdropFilter: 'blur(10px)',
@@ -531,27 +545,46 @@ function BannerAnnotations({ temp, airHum, soilHum, light, water, thresholds = {
               fontSize: '1rem',
             }}>🌿</div>
             <span style={{ fontSize: '0.78rem', color: '#1f2937', fontWeight: 700 }}>
-              Ngưỡng cây trồng
+              Tiêu chuẩn cây trồng
             </span>
           </div>
           {checks.map(c => (
             <div key={c.label} style={{
               display: 'flex', alignItems: 'center',
-              marginBottom: 7, gap: 6,
+              marginBottom: 7, gap: 8,
             }}>
-              <span style={{ fontSize: '0.72rem', color: '#6b7280', flex: 1 }}>{c.label}</span>
-              <span style={{
-                fontSize: '0.78rem', fontWeight: 700,
-                color: c.ok === null ? '#9ca3af' : c.ok ? '#16a34a' : '#dc2626',
-              }}>
-                {c.current !== null ? `${c.current}${c.unit}` : '--'}
+              <span style={{ fontSize: '0.72rem', color: '#6b7280', flex: 1, minWidth: 0 }}>
+                {c.label}
               </span>
-              <span style={{ fontSize: '0.65rem', color: '#9ca3af' }}>/ {c.ideal}</span>
+              <div style={{
+                display: 'flex',
+                alignItems: 'baseline',
+                justifyContent: 'flex-end',
+                gap: 4,
+                flexWrap: 'wrap',
+                minWidth: 88,
+              }}>
+                <span style={{
+                  fontSize: '0.78rem', fontWeight: 700, lineHeight: 1.2,
+                  color: c.ok === null ? '#9ca3af' : c.ok ? '#16a34a' : '#dc2626',
+                }}>
+                  {c.current !== null ? `${c.current}${c.unit}` : '--'}
+                </span>
+                {c.current !== null && (
+                  <>
+                    <span style={{ fontSize: '0.62rem', color: '#d1d5db', lineHeight: 1.2 }}>/</span>
+                    <span style={{ fontSize: '0.65rem', color: '#9ca3af', lineHeight: 1.2, fontWeight: 600 }}>
+                      {c.threshold}
+                    </span>
+                  </>
+                )}
+              </div>
               <span style={{
                 fontSize: '0.65rem',
                 color: c.ok === null ? '#9ca3af' : c.ok ? '#16a34a' : '#dc2626',
                 background: c.ok === null ? '#f3f4f6' : c.ok ? '#dcfce7' : '#fee2e2',
                 borderRadius: 5, padding: '2px 7px', fontWeight: 800,
+                flexShrink: 0,
               }}>
                 {c.ok === null ? '–' : c.ok ? '✓' : '✗'}
               </span>
@@ -591,9 +624,8 @@ function EnvCallout({ temp, airHum, soilHum, light, thresholds = {}, gardenStatu
       label: 'Độ ẩm đất',
       current: soilHum,
       unit: '%',
-      ideal: `${thresholds.minSoil ?? 35}–${thresholds.targetSoil ?? 65}%`,
-      ok: soilHum === null ? null
-        : soilHum >= (thresholds.minSoil ?? 35) && soilHum <= (thresholds.targetSoil ?? 65),
+      ideal: soilMoistureThresholdLabel(thresholds.minSoil ?? 35),
+      ok: isSoilMoistureOk(soilHum, thresholds.minSoil ?? 35),
     },
     {
       label: 'Ánh sáng',

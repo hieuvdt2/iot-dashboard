@@ -1780,7 +1780,9 @@ body {
 }
 
 /* ===== CONFIG PAGE ===== */
-.config-shell { display: flex; flex-direction: column; gap: 16px; }
+.config-shell { display: flex; flex-direction: column; gap: 16px; align-items: center; }
+
+.config-tabs { align-self: center; }
 
 .config-tabs {
   display: inline-flex;
@@ -1814,6 +1816,123 @@ body {
   display: grid;
   grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr);
   gap: 14px;
+}
+
+.config-single {
+  width: 100%;
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.config-single-centered {
+  display: flex;
+  justify-content: center;
+}
+
+.config-card-large {
+  width: 100%;
+  padding: 28px 32px;
+  gap: 16px;
+}
+
+.config-card-large .config-header h3 {
+  font-size: 1.2rem;
+}
+
+.config-card-large .config-note,
+.config-card-large .config-draft-hint {
+  font-size: 0.9rem;
+}
+
+.config-card-large .config-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.config-card-large .config-item {
+  padding: 18px 20px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+}
+
+.config-card-large .config-item strong {
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.config-card-large .config-header {
+  align-items: flex-start;
+}
+
+.config-card-large .config-actions .btn-save,
+.config-card-large .config-actions .btn-ghost {
+  padding: 10px 18px;
+  font-size: 0.9rem;
+}
+
+.config-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.config-sync-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.config-sync-badge.synced {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.config-sync-badge.pending {
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: #fed7aa;
+}
+
+.config-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.config-draft-hint {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  font-size: 0.82rem;
+}
+
+.config-item.changed {
+  border-color: #fdba74;
+  background: #fff7ed;
+}
+
+.config-item-old {
+  font-size: 0.72rem;
+  color: #9a3412;
+  font-weight: 600;
+}
+
+.modal-note {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-2);
+  line-height: 1.45;
 }
 
 .config-card, .preset-card {
@@ -1862,8 +1981,51 @@ body {
 
 .preset-layout {
   display: grid;
-  grid-template-columns: minmax(280px,1fr) minmax(280px,1fr);
+  grid-template-columns: minmax(320px, 1fr) minmax(280px, 1fr);
   gap: 14px;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.preset-layout-centered {
+  align-items: start;
+}
+
+.preset-card-large,
+.preview-card-large {
+  padding: 24px 28px;
+}
+
+.preset-config-list {
+  margin-top: 4px;
+}
+
+.preset-actions-main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.preset-list-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.preset-row.active {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.config-draft-hint.muted {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #64748b;
 }
 
 .preset-header h3 { font-size: 0.95rem; font-weight: 600; }
@@ -1964,6 +2126,32 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.modal-card-wide {
+  width: min(760px, 100%);
+}
+
+.modal-field.has-error input {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+.field-error {
+  font-size: 0.74rem;
+  color: #dc2626;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.form-alert {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 0.84rem;
+  font-weight: 600;
 }
 
 .modal-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -2328,6 +2516,17 @@ body {
   .settings-grid { grid-template-columns: 1fr; }
   .auth-form { grid-template-columns: 1fr; }
   .modal-grid { grid-template-columns: 1fr; }
+  .config-card-large .config-list { grid-template-columns: 1fr; }
+  .config-card-large { padding: 22px 18px; }
+  .config-card-large .config-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+  .config-card-large .config-actions .btn-save,
+  .config-card-large .config-actions .btn-ghost {
+    flex: 1;
+    justify-content: center;
+  }
   .btn { width: 100%; justify-content: center; }
 }
 

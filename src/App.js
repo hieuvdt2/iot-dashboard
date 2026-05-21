@@ -23,6 +23,28 @@ const DEFAULT_CONFIG = {
   maxWaterDistance: 20,
 };
 
+const THRESHOLD_KEYS = [
+  'minSoil',
+  'targetSoil',
+  'maxTemp',
+  'minAirHum',
+  'maxLux',
+  'maxWaterDistance',
+];
+
+const loadStoredThresholds = () => {
+  try {
+    const saved = localStorage.getItem('iot_thresholds');
+    return saved ? JSON.parse(saved) : { ...DEFAULT_CONFIG };
+  } catch (e) {
+    return { ...DEFAULT_CONFIG };
+  }
+};
+
+const thresholdsEqual = (a, b) => (
+  THRESHOLD_KEYS.every((key) => Number(a?.[key]) === Number(b?.[key]))
+);
+
 const BASE_PRESETS = [
   {
     key: 'rau',
@@ -145,16 +167,8 @@ function App() {
       return false;
     }
   });
-  const [thresholds, setThresholds] = useState(() => {
-    try {
-      const saved = localStorage.getItem('iot_thresholds');
-      return saved
-        ? JSON.parse(saved)
-        : DEFAULT_CONFIG;
-    } catch (e) {
-      return DEFAULT_CONFIG;
-    }
-  });
+  const [deployedThresholds, setDeployedThresholds] = useState(loadStoredThresholds);
+  const [draftThresholds, setDraftThresholds] = useState(loadStoredThresholds);
 
   const presets = [...BASE_PRESETS, ...customPresets];
   const canEdit = role === 'admin';
@@ -256,7 +270,12 @@ function App() {
     const unsubscribeConfig = firebaseService.subscribeConfig((config) => {
       const cleaned = { ...config };
       delete cleaned.updatedAt;
-      setThresholds((prev) => ({ ...prev, ...cleaned }));
+      setDeployedThresholds((prevDeployed) => {
+        setDraftThresholds((prevDraft) => (
+          thresholdsEqual(prevDraft, prevDeployed) ? cleaned : prevDraft
+        ));
+        return cleaned;
+      });
       setConfigReady(true);
       try {
         localStorage.setItem('iot_thresholds', JSON.stringify(cleaned));
@@ -314,13 +333,32 @@ function App() {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  const updateThreshold = (key, value) => {
+  const hasUnsavedDraft = useMemo(
+    () => !thresholdsEqual(draftThresholds, deployedThresholds),
+    [draftThresholds, deployedThresholds]
+  );
+
+  useEffect(() => {
+    if (hasUnsavedDraft) return;
+    const matched = presets.find((item) => thresholdsEqual(item.config, deployedThresholds));
+    setSelectedPreset(matched?.key || '');
+  }, [deployedThresholds, presets, hasUnsavedDraft]);
+
+  const applyDraftThresholds = (config) => {
     if (!canEdit) {
       setToast({ type: 'warning', message: 'Bạn không có quyền chỉnh cấu hình.' });
       return;
     }
     setSelectedPreset('');
-    setThresholds((prev) => ({ ...prev, [key]: value }));
+    setDraftThresholds({ ...config });
+    setToast({ type: 'success', message: 'Đã cập nhật bản nháp. Bấm "Lưu & Gửi ESP32" để áp dụng.' });
+  };
+
+  const discardDraft = () => {
+    setDraftThresholds({ ...deployedThresholds });
+    const matchedPreset = presets.find((item) => thresholdsEqual(item.config, deployedThresholds));
+    setSelectedPreset(matchedPreset?.key || '');
+    setToast({ type: 'success', message: 'Đã khôi phục cấu hình đang chạy trên ESP32.' });
   };
 
   const saveThresholds = () => {
@@ -328,16 +366,27 @@ function App() {
       setToast({ type: 'warning', message: 'Bạn không có quyền chỉnh cấu hình.' });
       return;
     }
-    localStorage.setItem('iot_thresholds', JSON.stringify(thresholds));
-    firebaseService.saveConfig(thresholds);
-    mqttService.publishConfig(thresholds);
+    if (!hasUnsavedDraft) {
+      setToast({ type: 'warning', message: 'Không có thay đổi mới để gửi.' });
+      return;
+    }
+    setDeployedThresholds({ ...draftThresholds });
+    localStorage.setItem('iot_thresholds', JSON.stringify(draftThresholds));
+    firebaseService.saveConfig(draftThresholds);
+    mqttService.publishConfig(draftThresholds);
     setConfigReady(true);
-    setToast({ type: 'success', message: 'Đã gửi cấu hình xuống ESP32' });
+    const presetName = presets.find((item) => item.key === selectedPreset)?.name;
+    setToast({
+      type: 'success',
+      message: presetName
+        ? `Đã gửi preset "${presetName}" xuống ESP32`
+        : 'Đã gửi cấu hình xuống ESP32',
+    });
   };
 
-  const applyPreset = (presetKey) => {
+  const selectPreset = (presetKey) => {
     if (!canEdit) {
-      setToast({ type: 'warning', message: 'Bạn không có quyền chỉnh preset.' });
+      setToast({ type: 'warning', message: 'Bạn không có quyền chọn preset.' });
       return;
     }
     if (!presetKey) {
@@ -347,12 +396,11 @@ function App() {
     const preset = presets.find((item) => item.key === presetKey);
     if (!preset) return;
     setSelectedPreset(presetKey);
-    setThresholds(preset.config);
-    localStorage.setItem('iot_thresholds', JSON.stringify(preset.config));
-    firebaseService.saveConfig(preset.config);
-    mqttService.publishConfig(preset.config);
-    setConfigReady(true);
-    setToast({ type: 'success', message: `Đã áp dụng preset: ${preset.name}` });
+    setDraftThresholds({ ...preset.config });
+    setToast({
+      type: 'success',
+      message: `Đã chọn preset "${preset.name}". Bấm "Lưu & Gửi ESP32" để áp dụng.`,
+    });
   };
 
   const addPreset = (name, config) => {
@@ -374,7 +422,6 @@ function App() {
       suffix += 1;
     }
     firebaseService.savePreset(key, { name: trimmed, config: { ...config } });
-    setSelectedPreset(key);
     setToast({ type: 'success', message: `Đã thêm preset: ${trimmed}` });
   };
 
@@ -389,9 +436,6 @@ function App() {
       return;
     }
     firebaseService.savePreset(presetKey, { name: trimmed, config: { ...config } });
-    if (selectedPreset === presetKey) {
-      setThresholds(config);
-    }
     setToast({ type: 'success', message: `Đã cập nhật preset: ${trimmed}` });
   };
 
@@ -455,24 +499,24 @@ function App() {
   const alerts = useMemo(() => {
     const nextAlerts = [];
     if (sensorData && hasConfig) {
-      if (sensorData.do_am_dat < thresholds.minSoil) {
+      if (sensorData.do_am_dat < deployedThresholds.minSoil) {
         nextAlerts.push('Đất đang khô, cần tưới');
       }
-      if (sensorData.nhiet_do > thresholds.maxTemp) {
+      if (sensorData.nhiet_do > deployedThresholds.maxTemp) {
         nextAlerts.push('Nhiệt độ cao');
       }
-      if (sensorData.do_am_khong_khi < thresholds.minAirHum) {
+      if (sensorData.do_am_khong_khi < deployedThresholds.minAirHum) {
         nextAlerts.push('Không khí khô');
       }
-      if (sensorData.anh_sang > thresholds.maxLux) {
+      if (sensorData.anh_sang > deployedThresholds.maxLux) {
         nextAlerts.push('Ánh sáng quá mạnh');
       }
-      if (sensorData.muc_nuoc > thresholds.maxWaterDistance) {
+      if (sensorData.muc_nuoc > deployedThresholds.maxWaterDistance) {
         nextAlerts.push('Cảnh báo: mực nước thấp');
       }
     }
     return nextAlerts;
-  }, [sensorData, hasConfig, thresholds]);
+  }, [sensorData, hasConfig, deployedThresholds]);
 
   useEffect(() => {
     if (alerts.length > 0 && hasConfig) {
@@ -501,13 +545,13 @@ function App() {
     }
 
     let status = 'TOT';
-    if (soil < thresholds.minSoil || temp > thresholds.maxTemp || humi < thresholds.minAirHum) {
+    if (soil < deployedThresholds.minSoil || temp > deployedThresholds.maxTemp || humi < deployedThresholds.minAirHum) {
       status = 'CAN_CHU_Y';
     }
     if (
-      soil < thresholds.minSoil - 10 ||
-      temp > thresholds.maxTemp + 5 ||
-      humi < thresholds.minAirHum - 10
+      soil < deployedThresholds.minSoil - 10 ||
+      temp > deployedThresholds.maxTemp + 5 ||
+      humi < deployedThresholds.minAirHum - 10
     ) {
       status = 'NGUY_HIEM';
     }
@@ -551,16 +595,16 @@ function App() {
   const pumpOn = pumpStatus === 'DANG_TUOI';
   const waterDistance = sensorData?.muc_nuoc ?? null;
   const waterPct = waterDistance !== null
-    ? Math.min(100, Math.max(0, 100 - Math.round((waterDistance / (thresholds.maxWaterDistance ?? 25)) * 100)))
+    ? Math.min(100, Math.max(0, 100 - Math.round((waterDistance / (deployedThresholds.maxWaterDistance ?? 25)) * 100)))
     : 0;
 
   const needsWatering = Boolean(
-    hasConfig && sensorData && sensorData.do_am_dat < thresholds.minSoil
+    hasConfig && sensorData && sensorData.do_am_dat < deployedThresholds.minSoil
   );
 
   useEffect(() => {
-    console.log('[iot] Cấu hình ngưỡng hiện tại:', thresholds);
-  }, [thresholds]);
+    console.log('[iot] Cấu hình ngưỡng hiện tại:', deployedThresholds);
+  }, [deployedThresholds]);
 
   useEffect(() => {
     if (!sensorData) return;
@@ -789,17 +833,20 @@ function App() {
                         onHistoryDateChange={(value) => setHistoryDate(value)}
                         onClearHistory={clearHistory}
                         canControl={canControl}
-                        thresholds={thresholds}
+                        thresholds={deployedThresholds}
                       />
                     ) : (
                       <ConfigPage
                         presets={presets}
                         selectedPreset={selectedPreset}
                         configReady={configReady}
-                        thresholds={thresholds}
+                        draftThresholds={draftThresholds}
+                        deployedThresholds={deployedThresholds}
+                        hasUnsavedDraft={hasUnsavedDraft}
                         sensorData={sensorData}
-                        onSelectPreset={applyPreset}
-                        onChangeThreshold={updateThreshold}
+                        onSelectPreset={selectPreset}
+                        onApplyDraft={applyDraftThresholds}
+                        onDiscardDraft={discardDraft}
                         onSave={saveThresholds}
                         onAddPreset={addPreset}
                         onUpdatePreset={updatePreset}
