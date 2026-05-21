@@ -90,6 +90,89 @@ function ConfigPage({
   const [thresholdForm, setThresholdForm] = useState(toThresholdForm(draftThresholds));
   const [thresholdErrors, setThresholdErrors] = useState({});
   const [presetFieldErrors, setPresetFieldErrors] = useState({});
+  const [confirmState, setConfirmState] = useState(null);
+
+  const closeConfirm = () => setConfirmState(null);
+
+  const runConfirmedSave = () => {
+    closeConfirm();
+    onSave();
+  };
+
+  const handleSaveClick = () => {
+    if (!canEdit || !hasUnsavedDraft) return;
+
+    if (activeSection === 'custom') {
+      if (appliedPreset && !thresholdsEqual(draftThresholds, appliedPreset.config)) {
+        setConfirmState({
+          title: 'Thay preset bằng tự cấu hình?',
+          message: `ESP32 đang áp dụng preset "${appliedPreset.name}". Gửi cấu hình tự chỉnh sẽ thay thế preset này trên thiết bị. Bạn có chắc chắn muốn tiếp tục?`,
+          confirmLabel: 'Áp dụng tự cấu hình',
+          onConfirm: runConfirmedSave,
+        });
+        return;
+      }
+    }
+
+    if (activeSection === 'preset') {
+      const targetPreset = presets.find((preset) => preset.key === selectedPreset);
+      if (!targetPreset) return;
+
+      const replacingCustom = !appliedPreset;
+      const replacingOtherPreset = appliedPreset && appliedPreset.key !== selectedPreset;
+
+      if (replacingCustom || replacingOtherPreset) {
+        const currentLabel = appliedPreset
+          ? `preset "${appliedPreset.name}"`
+          : 'cấu hình tự chỉnh';
+        setConfirmState({
+          title: 'Áp dụng preset mới?',
+          message: `Preset "${targetPreset.name}" sẽ thay thế ${currentLabel} đang chạy trên ESP32. Bạn có muốn áp dụng preset này?`,
+          confirmLabel: `Áp dụng "${targetPreset.name}"`,
+          onConfirm: runConfirmedSave,
+        });
+        return;
+      }
+    }
+
+    onSave();
+  };
+
+  const requestPresetSelection = (presetKey) => {
+    if (!canEdit || !presetKey || presetKey === selectedPreset) return;
+
+    const targetPreset = presets.find((preset) => preset.key === presetKey);
+    if (!targetPreset) return;
+
+    const needsConfirm = !appliedPreset || appliedPreset.key !== presetKey;
+
+    if (needsConfirm) {
+      const currentLabel = appliedPreset
+        ? `preset "${appliedPreset.name}"`
+        : 'cấu hình tự chỉnh';
+      setConfirmState({
+        title: 'Chọn preset này?',
+        message: `Preset "${targetPreset.name}" sẽ thay thế ${currentLabel} trong bản nháp. Bạn vẫn cần bấm "Lưu & Gửi ESP32" để áp dụng lên thiết bị.`,
+        confirmLabel: `Chọn "${targetPreset.name}"`,
+        onConfirm: () => {
+          closeConfirm();
+          onSelectPreset(presetKey);
+        },
+      });
+      return;
+    }
+
+    onSelectPreset(presetKey);
+  };
+
+  const handlePresetSelectChange = (event) => {
+    const presetKey = event.target.value;
+    if (!presetKey) {
+      onSelectPreset('');
+      return;
+    }
+    requestPresetSelection(presetKey);
+  };
 
   const configItems = THRESHOLD_FIELDS.map((field) => ({
     label: field.label,
@@ -324,7 +407,7 @@ function ConfigPage({
                   <button
                     type="button"
                     className="btn-save"
-                    onClick={onSave}
+                    onClick={handleSaveClick}
                     disabled={!canEdit || !hasUnsavedDraft}
                   >
                     Lưu & Gửi ESP32
@@ -390,7 +473,7 @@ function ConfigPage({
               <select
                 className="preset-select"
                 value={selectedPreset}
-                onChange={(e) => onSelectPreset(e.target.value)}
+                onChange={handlePresetSelectChange}
                 disabled={!canEdit}
               >
                 <option value="">— Chọn preset —</option>
@@ -434,7 +517,7 @@ function ConfigPage({
                 <button
                   type="button"
                   className="btn-save"
-                  onClick={onSave}
+                  onClick={handleSaveClick}
                   disabled={!canEdit || !hasUnsavedDraft}
                 >
                   Lưu & Gửi ESP32
@@ -462,7 +545,7 @@ function ConfigPage({
                       key={preset.key}
                       type="button"
                       className={`preset-row ${selectedPreset === preset.key ? 'active' : ''}`}
-                      onClick={() => onSelectPreset(preset.key)}
+                      onClick={() => requestPresetSelection(preset.key)}
                       disabled={!canEdit}
                     >
                       <div>
@@ -545,6 +628,27 @@ function ConfigPage({
           </div>
         )}
       </section>
+
+      {confirmState && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal-card confirm-modal">
+            <div className="modal-header">
+              <h3>{confirmState.title}</h3>
+            </div>
+            <div className="modal-body">
+              <p className="confirm-modal-message">{confirmState.message}</p>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn-ghost" onClick={closeConfirm}>
+                Hủy
+              </button>
+              <button type="button" className="btn-save" onClick={confirmState.onConfirm}>
+                {confirmState.confirmLabel || 'Xác nhận'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isThresholdModalOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">

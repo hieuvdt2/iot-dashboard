@@ -6,6 +6,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const admin = require('firebase-admin');
+const { handleAssistantChat, pickProvider } = require('./assistant');
 
 // ===== MQTT CONFIG =====
 const MQTT_URL = process.env.MQTT_URL;
@@ -149,6 +150,27 @@ app.get('/api/sensor', (req, res) => {
   res.json({ data: lastSensorData, timestamp: new Date().toISOString() });
 });
 
+app.get('/api/assistant/status', (req, res) => {
+  const provider = pickProvider();
+  res.json({
+    enabled: Boolean(provider),
+    provider: provider || null,
+  });
+});
+
+app.post('/api/assistant/chat', async (req, res) => {
+  try {
+    const { messages, context } = req.body || {};
+    const result = await handleAssistantChat({ messages, context });
+    res.json(result);
+  } catch (err) {
+    console.error('[Assistant] Error:', err.message);
+    res.status(err.status || 500).json({
+      error: err.message || 'Không thể xử lý yêu cầu trợ lý',
+    });
+  }
+});
+
 // SPA fallback
 app.get('*', (req, res) => {
   const indexPath = path.join(buildPath, 'index.html');
@@ -257,5 +279,6 @@ server.listen(PORT, () => {
   console.log(`   MQTT:    ${MQTT_URL}`);
   console.log(`   Topics:  ${TOPICS.SENSOR} (sub), ${TOPICS.CONTROL} (pub)\n`);
   console.log(`   Firebase: ${firebaseReady ? 'ready' : 'not ready'}`);
-  console.log(`   Device:   ${DEVICE_ID}\n`);
+  console.log(`   Device:   ${DEVICE_ID}`);
+  console.log(`   AI:       ${pickProvider() || 'disabled (set GEMINI_API_KEY or OPENAI_API_KEY)'}\n`);
 });

@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import './App.css';
 
 import DashboardPage from './shared/components/DashboardPage';
 import ConfigPage from './shared/components/ConfigPage';
 import ControlButtons from './shared/components/ControlButtons';
+import GardenAssistant from './shared/components/GardenAssistant';
+import EnvironmentToast from './shared/components/EnvironmentToast';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import AdminPage from './pages/AdminPage';
@@ -13,6 +15,9 @@ import { firebaseService } from './shared/services/firebaseService';
 import {
   buildHistoryFromFirebase,
 } from './shared/utils/sensorHistory';
+import {
+  buildEnvironmentAlerts,
+} from './shared/utils/environmentAlerts';
 
 const DEFAULT_CONFIG = {
   minSoil: 35,
@@ -158,6 +163,8 @@ function App() {
   const [authLoading, setAuthLoading] = useState(true); // chờ Firebase restore session
   const [role, setRole] = useState('viewer');
   const [authError, setAuthError] = useState('');
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef(null);
   const [users, setUsers] = useState({});
   const [roles, setRoles] = useState({});
   const [configReady, setConfigReady] = useState(() => {
@@ -354,6 +361,26 @@ function App() {
     setToast({ type: 'success', message: 'Đã cập nhật bản nháp. Bấm "Lưu & Gửi ESP32" để áp dụng.' });
   };
 
+  const applyAssistantSuggestion = (config, presetKey = '', label = '') => {
+    if (!canEdit) {
+      setToast({ type: 'warning', message: 'Bạn không có quyền chỉnh cấu hình.' });
+      return;
+    }
+    setDraftThresholds({ ...config });
+    if (presetKey && presets.some((item) => item.key === presetKey)) {
+      setSelectedPreset(presetKey);
+    } else {
+      setSelectedPreset('');
+    }
+    setActiveTab('config');
+    setToast({
+      type: 'success',
+      message: label
+        ? `Đã áp dụng gợi ý "${label}" vào bản nháp. Kiểm tra tab Cấu hình rồi bấm Lưu & Gửi ESP32.`
+        : 'Đã áp dụng gợi ý vào bản nháp. Kiểm tra tab Cấu hình rồi bấm Lưu & Gửi ESP32.',
+    });
+  };
+
   const discardDraft = () => {
     setDraftThresholds({ ...deployedThresholds });
     const matchedPreset = presets.find((item) => thresholdsEqual(item.config, deployedThresholds));
@@ -468,8 +495,20 @@ function App() {
   };
 
   const handleSignOut = async () => {
+    setUserMenuOpen(false);
     await firebaseService.signOut();
   };
+
+  useEffect(() => {
+    if (!userMenuOpen) return undefined;
+    const onClickOutside = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [userMenuOpen]);
 
   const handleSetRole = async (uid, nextRole) => {
     if (!canEdit) return;
@@ -496,33 +535,10 @@ function App() {
     sensorData?.has_config ?? sensorData?.config ?? configReady
   );
 
-  const alerts = useMemo(() => {
-    const nextAlerts = [];
-    if (sensorData && hasConfig) {
-      if (sensorData.do_am_dat < deployedThresholds.minSoil) {
-        nextAlerts.push('Đất đang khô, cần tưới');
-      }
-      if (sensorData.nhiet_do > deployedThresholds.maxTemp) {
-        nextAlerts.push('Nhiệt độ cao');
-      }
-      if (sensorData.do_am_khong_khi < deployedThresholds.minAirHum) {
-        nextAlerts.push('Không khí khô');
-      }
-      if (sensorData.anh_sang > deployedThresholds.maxLux) {
-        nextAlerts.push('Ánh sáng quá mạnh');
-      }
-      if (sensorData.muc_nuoc > deployedThresholds.maxWaterDistance) {
-        nextAlerts.push('Cảnh báo: mực nước thấp');
-      }
-    }
-    return nextAlerts;
-  }, [sensorData, hasConfig, deployedThresholds]);
-
-  useEffect(() => {
-    if (alerts.length > 0 && hasConfig) {
-      setToast({ type: 'warning', message: alerts[0] });
-    }
-  }, [alerts, hasConfig]);
+  const alerts = useMemo(
+    () => (hasConfig && sensorData ? buildEnvironmentAlerts(sensorData, deployedThresholds) : []),
+    [sensorData, hasConfig, deployedThresholds]
+  );
 
   const gardenStatus = (() => {
     if (sensorData?.garden_status) return sensorData.garden_status;
@@ -637,6 +653,14 @@ function App() {
     ? authUser.email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
     : 'Bạn';
 
+  const roleLabelMap = {
+    admin: 'Quản trị viên',
+    viewer: 'Người xem',
+  };
+  const roleLabel = roleLabelMap[role] || role || 'Người xem';
+  const avatarUrl = authUser?.photoURL || null;
+  const avatarInitial = displayName[0]?.toUpperCase() || '?';
+
   /* Chờ Firebase kiểm tra session — tránh flash màn hình login */
   if (authLoading) {
     return (
@@ -713,8 +737,52 @@ function App() {
 
           <div className="sidebar-bottom">
             {authUser ? (
-              <div className="sidebar-avatar" title={authUser.email} onClick={handleSignOut}>
-                {displayName[0]}
+              <div className="sidebar-user-wrap" ref={userMenuRef}>
+                <button
+                  type="button"
+                  className={`sidebar-avatar ${userMenuOpen ? 'is-open' : ''}`}
+                  aria-label="Thông tin tài khoản"
+                  aria-expanded={userMenuOpen}
+                  onClick={() => setUserMenuOpen((open) => !open)}
+                >
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="" className="sidebar-avatar-img" />
+                  ) : (
+                    avatarInitial
+                  )}
+                </button>
+
+                {userMenuOpen && (
+                  <div className="user-menu-popover" role="dialog" aria-label="Thông tin tài khoản">
+                    <div className="user-menu-header">
+                      <div className="user-menu-avatar">
+                        {avatarUrl ? (
+                          <img src={avatarUrl} alt="" className="sidebar-avatar-img" />
+                        ) : (
+                          avatarInitial
+                        )}
+                      </div>
+                      <div className="user-menu-meta">
+                        <div className="user-menu-name">{displayName}</div>
+                        <span className={`role-pill ${role}`}>{roleLabel}</span>
+                      </div>
+                    </div>
+
+                    <div className="user-menu-row">
+                      <span className="user-menu-label">Email</span>
+                      <span className="user-menu-value">{authUser.email}</span>
+                    </div>
+
+                    <button type="button" className="user-menu-logout" onClick={handleSignOut}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                        <polyline points="16 17 21 12 16 7"/>
+                        <line x1="21" y1="12" x2="9" y2="12"/>
+                      </svg>
+                      Đăng xuất
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <Link className="sidebar-icon" to="/dang-nhap" title="Đăng nhập">
@@ -749,19 +817,6 @@ function App() {
               <div className={`connection-badge ${currentStatus.cls}`}>
                 {connected ? 'Đã kết nối' : mqttStatus === 'reconnecting' ? 'Đang kết nối...' : 'Mất kết nối'}
               </div>
-              {authUser && (
-                <>
-                  <span className={`role-pill ${role}`}>{role || 'viewer'}</span>
-                  <button className="btn-support" onClick={handleSignOut}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                      <polyline points="16 17 21 12 16 7"/>
-                      <line x1="21" y1="12" x2="9" y2="12"/>
-                    </svg>
-                    Đăng xuất
-                  </button>
-                </>
-              )}
               <button className="btn-sync" onClick={() => window.location.reload()}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="23 4 23 10 17 10"/>
@@ -931,10 +986,27 @@ function App() {
           </main>
         </div>
 
+        {configReady && alerts.length > 0 && authUser && (
+          <EnvironmentToast alerts={alerts} />
+        )}
+
         {toast && (
-          <div className={`toast ${toast.type}`}>
+          <div className={`toast ${toast.type} ${alerts.length > 0 ? 'toast-stacked' : ''}`}>
             {toast.message}
           </div>
+        )}
+
+        {authUser && (
+          <GardenAssistant
+            sensorData={sensorData}
+            deployedThresholds={deployedThresholds}
+            presets={presets}
+            gardenStatusLabel={gardenStatusLabel}
+            autoMode={autoMode}
+            pumpStatusLabel={pumpStatusLabel}
+            canEdit={canEdit}
+            onApplySuggestion={applyAssistantSuggestion}
+          />
         )}
       </div>
     </BrowserRouter>

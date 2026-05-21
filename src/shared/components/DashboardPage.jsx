@@ -1,5 +1,6 @@
 import React from 'react';
 import SensorChart from './SensorChart';
+import EnvironmentAlertBanner from './EnvironmentAlertBanner';
 
 /* ── Ngưỡng độ ẩm đất: minSoil = khô (cần tưới), targetSoil = dừng tưới AUTO ── */
 const isSoilMoistureOk = (soilHum, minSoil) => (
@@ -397,14 +398,7 @@ function DashboardPage({
         </div>
       )}
       {alerts.length > 0 && configReady && (
-        <div className="alert-banner">
-          <div className="alert-title">Cảnh báo môi trường</div>
-          <div className="alert-list">
-            {alerts.map((item, i) => (
-              <span className="alert-item" key={`${item}-${i}`}>{item}</span>
-            ))}
-          </div>
-        </div>
+        <EnvironmentAlertBanner alerts={alerts} />
       )}
 
       {/* ── HERO BANNER ── */}
