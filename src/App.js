@@ -4,6 +4,7 @@ import './App.css';
 
 import DashboardPage from './shared/components/DashboardPage';
 import ConfigPage from './shared/components/ConfigPage';
+import ControlButtons from './shared/components/ControlButtons';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import AdminPage from './pages/AdminPage';
@@ -538,6 +539,19 @@ function App() {
     ? gardenStatus.toLowerCase()
     : 'muted';
 
+  const autoModeLabelMap = {
+    BAT: 'Tự động',
+    TAT: 'Thủ công',
+  };
+  const autoModeLabel = autoModeLabelMap[autoMode] || autoMode || '---';
+  const modeTone = autoMode === 'BAT' ? 'on' : autoMode === 'TAT' ? 'off' : 'muted';
+  const pumpTone = pumpStatus === 'DANG_TUOI' ? 'on' : pumpStatus === 'KHONG_TUOI' ? 'off' : 'muted';
+  const pumpOn = pumpStatus === 'DANG_TUOI';
+  const waterDistance = sensorData?.muc_nuoc ?? null;
+  const waterPct = waterDistance !== null
+    ? Math.min(100, Math.max(0, 100 - Math.round((waterDistance / (thresholds.maxWaterDistance ?? 25)) * 100)))
+    : 0;
+
   const needsWatering = Boolean(
     hasConfig && sensorData && sensorData.do_am_dat < thresholds.minSoil
   );
@@ -566,101 +580,166 @@ function App() {
     });
   }, [sensorData, gardenStatus, autoMode, pumpStatus, needsWatering, configReady]);
 
+  const greeting = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Chào buổi sáng';
+    if (h < 18) return 'Chào buổi chiều';
+    return 'Chào buổi tối';
+  })();
+
+  const displayName = authUser?.email
+    ? authUser.email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+    : 'Bạn';
+
   return (
     <BrowserRouter>
       <div className="app">
-        {showLoading && (
-          <div className="loading-overlay" aria-live="polite">
-            <div className="loading-card">
-              <div className="loading-spinner" />
-              <div className="loading-title">Đang kết nối hệ thống</div>
-              <div className="loading-subtitle">
-                {loadingMessages.join(' ')}
+        {/* ===== SIDEBAR ===== */}
+        <aside className="sidebar">
+          <div className="sidebar-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2a10 10 0 0 1 0 20"/>
+              <path d="M12 2C6.48 2 2 6.48 2 12"/>
+              <path d="M7 15c1.5-2 3.5-3 5-3s3.5 1 5 3"/>
+              <line x1="12" y1="12" x2="12" y2="20"/>
+            </svg>
+          </div>
+
+          <nav className="sidebar-nav">
+            <Link className={`sidebar-icon ${activeTab === 'dashboard' ? 'active' : ''}`} to="/dashboard" title="Dashboard" onClick={() => setActiveTab('dashboard')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+              </svg>
+            </Link>
+            <Link className={`sidebar-icon ${activeTab === 'config' ? 'active' : ''}`} to="/dashboard" title="Cấu hình" onClick={() => setActiveTab('config')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+              </svg>
+            </Link>
+            <div className="sidebar-divider"/>
+            {canEdit && (
+              <Link className="sidebar-icon" to="/admin" title="Quản trị">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+              </Link>
+            )}
+            <div className="sidebar-divider"/>
+            <Link
+              className={`sidebar-icon ${activeTab === 'settings' ? 'active' : ''}`}
+              to="/settings"
+              title="Điều khiển bơm"
+              onClick={() => setActiveTab('settings')}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+            </Link>
+          </nav>
+
+          <div className="sidebar-bottom">
+            {authUser ? (
+              <div className="sidebar-avatar" title={authUser.email} onClick={handleSignOut}>
+                {displayName[0]}
+              </div>
+            ) : (
+              <Link className="sidebar-icon" to="/dang-nhap" title="Đăng nhập">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                  <polyline points="10 17 15 12 10 7"/>
+                  <line x1="15" y1="12" x2="3" y2="12"/>
+                </svg>
+              </Link>
+            )}
+          </div>
+        </aside>
+
+        {/* ===== CONTENT ===== */}
+        <div className="app-content">
+          {showLoading && (
+            <div className="loading-overlay" aria-live="polite">
+              <div className="loading-card">
+                <div className="loading-spinner" />
+                <div className="loading-title">Đang kết nối hệ thống</div>
+                <div className="loading-subtitle">{loadingMessages.join(' ')}</div>
               </div>
             </div>
-          </div>
-        )}
-        <header className="app-header">
-          <div className="header-left">
-            <h1>📊 IoT Dashboard</h1>
-            <span className="header-subtitle">ESP32 Sensor Monitor</span>
-          </div>
-          <div className="header-actions">
-            <nav className="nav-links">
-              <Link to="/dashboard">Dashboard</Link>
-              <Link to="/admin">Admin</Link>
-            </nav>
-            <div className="user-badge">
-              {authUser ? (
+          )}
+
+          <header className="app-header">
+            <div className="header-greeting">
+              <h2>{greeting}, {displayName}!</h2>
+              <p>Đây là cập nhật mới nhất từ vườn thông minh của bạn</p>
+            </div>
+            <div className="header-actions">
+              <div className={`connection-badge ${currentStatus.cls}`}>
+                {connected ? 'Đã kết nối' : mqttStatus === 'reconnecting' ? 'Đang kết nối...' : 'Mất kết nối'}
+              </div>
+              {authUser && (
                 <>
                   <span className={`role-pill ${role}`}>{role || 'viewer'}</span>
-                  <span className="user-email">{authUser.email}</span>
-                  <button className="btn-ghost" onClick={handleSignOut}>
+                  <button className="btn-support" onClick={handleSignOut}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                      <polyline points="16 17 21 12 16 7"/>
+                      <line x1="21" y1="12" x2="9" y2="12"/>
+                    </svg>
                     Đăng xuất
                   </button>
                 </>
-              ) : (
-                <Link className="btn-ghost" to="/dang-nhap">
-                  Đăng nhập
-                </Link>
               )}
+              <button className="btn-sync" onClick={() => window.location.reload()}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="23 4 23 10 17 10"/>
+                  <polyline points="1 20 1 14 7 14"/>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
+                Sync dữ liệu
+              </button>
             </div>
-            <div className={`connection-badge ${currentStatus.cls}`}>
-              {currentStatus.text}
-            </div>
-          </div>
-        </header>
+          </header>
 
-        <main className="app-main">
-          <Routes>
-            <Route
-              path="/dang-nhap"
-              element={<LoginPage onSignIn={handleSignIn} authError={authError} />}
-            />
-            <Route
-              path="/dang-ky"
-              element={<RegisterPage onSignUp={handleSignUp} authError={authError} />}
-            />
-            <Route
-              path="/admin"
-              element={
-                canEdit ? (
-                  <AdminPage
-                    users={users}
-                    roles={roles}
-                    onSetRole={handleSetRole}
-                    authUser={authUser}
-                  />
-                ) : (
-                  <Navigate to="/dang-nhap" replace />
-                )
-              }
-            />
-            <Route
-              path="/"
-              element={<Navigate to={authUser ? '/dashboard' : '/dang-nhap'} replace />}
-            />
-            <Route
-              path="/dashboard"
-              element={
-                authUser ? (
-                  <>
-                    <div className="tab-bar">
-                      <button
-                        className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('dashboard')}
-                      >
-                        Dashboard cảm biến
-                      </button>
-                      <button
-                        className={`tab-btn ${activeTab === 'config' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('config')}
-                      >
-                        Cấu hình cây trồng
-                      </button>
-                    </div>
 
-                    {activeTab === 'dashboard' ? (
+
+          <main className="app-main">
+            <Routes>
+              <Route
+                path="/dang-nhap"
+                element={<LoginPage onSignIn={handleSignIn} authError={authError} />}
+              />
+              <Route
+                path="/dang-ky"
+                element={<RegisterPage onSignUp={handleSignUp} authError={authError} />}
+              />
+              <Route
+                path="/admin"
+                element={
+                  canEdit ? (
+                    <AdminPage
+                      users={users}
+                      roles={roles}
+                      onSetRole={handleSetRole}
+                      authUser={authUser}
+                    />
+                  ) : (
+                    <Navigate to="/dang-nhap" replace />
+                  )
+                }
+              />
+              <Route
+                path="/"
+                element={<Navigate to={authUser ? '/dashboard' : '/dang-nhap'} replace />}
+              />
+              <Route
+                path="/dashboard"
+                element={
+                  authUser ? (
+                    activeTab === 'dashboard' ? (
                       <DashboardPage
                         alerts={alerts}
                         configReady={configReady}
@@ -679,6 +758,7 @@ function App() {
                         onHistoryDateChange={(value) => setHistoryDate(value)}
                         onClearHistory={clearHistory}
                         canControl={canControl}
+                        thresholds={thresholds}
                       />
                     ) : (
                       <ConfigPage
@@ -695,20 +775,79 @@ function App() {
                         onDeletePreset={deletePreset}
                         canEdit={canEdit}
                       />
-                    )}
-                  </>
-                ) : (
-                  <Navigate to="/dang-nhap" replace />
-                )
-              }
-            />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </main>
+                    )
+                  ) : (
+                    <Navigate to="/dang-nhap" replace />
+                  )
+                }
+              />
+              <Route
+                path="/settings"
+                element={
+                  authUser ? (
+                    <div className="settings-panel">
+                      <ControlButtons
+                        connected={connected}
+                        autoMode={autoMode}
+                        pumpStatus={pumpStatus}
+                        canControl={canControl}
+                      />
 
-        <footer className="app-footer">
-          IoT Dashboard · ESP32 via MQTT · HiveMQ Cloud
-        </footer>
+                      <div className="settings-info">
+                        <div className={`settings-visual-card water-flow-card ${pumpOn ? 'flowing' : 'idle'}`}>
+                          <div className="visual-header">
+                            <span className="visual-title">Dòng chảy bơm</span>
+                            <span className={`mode-pill ${pumpTone}`}>{pumpStatusLabel || '---'}</span>
+                          </div>
+                          <div className="water-scene">
+                            <div className="tank">
+                              <div className="tank-water" style={{ height: `${waterPct}%` }} />
+                              <div className="tank-level">
+                                {waterDistance !== null ? `${waterPct}%` : '--'}
+                              </div>
+                              <div className="tank-sub">
+                                {waterDistance !== null ? `${waterDistance} cm` : '--'}
+                              </div>
+                            </div>
+                            <div className="pipe">
+                              <div className="pipe-line" />
+                              <div className="pipe-flow" />
+                            </div>
+                            <div className="pump-unit">
+                              <div className="pump-core" />
+                              <div className="pump-label">PUMP</div>
+                            </div>
+                            <div className="water-drops">
+                              <span className="drop d1" />
+                              <span className="drop d2" />
+                              <span className="drop d3" />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className={`settings-visual-card auto-mode-card ${autoMode === 'BAT' ? 'auto-on' : 'auto-off'}`}>
+                          <div className="visual-header">
+                            <span className="visual-title">Chế độ tưới</span>
+                            <span className={`mode-pill ${modeTone}`}>{autoModeLabel}</span>
+                          </div>
+                          <div className="robot-figure">
+                            <img
+                              src={`${process.env.PUBLIC_URL}/robot-ai.png`}
+                              alt="Robot AI tưới cây"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <Navigate to="/dang-nhap" replace />
+                  )
+                }
+              />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </main>
+        </div>
 
         {toast && (
           <div className={`toast ${toast.type}`}>
