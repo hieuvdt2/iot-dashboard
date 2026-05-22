@@ -4,21 +4,26 @@ export const SENSOR_KEYS = [
   { key: 'nhiet_do', label: 'Nhiệt độ (°C)', color: '#ff6b6b' },
   { key: 'do_am_khong_khi', label: 'Độ ẩm KK (%)', color: '#4dabf7' },
   { key: 'do_am_dat', label: 'Độ ẩm đất (%)', color: '#51cf66' },
+  { key: 'anh_sang', label: 'Ánh sáng (lux)', color: '#ffa94d' },
   { key: 'muc_nuoc', label: 'Mực nước (cm)', color: '#ffd43b' },
 ];
 
-export function addToHistory(prevHistory, newData) {
-  const timestamp = new Date().toLocaleTimeString('vi-VN', {
+const formatTime = (ts) =>
+  new Date(ts).toLocaleTimeString('vi-VN', {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
   });
+
+export function addToHistory(prevHistory, newData) {
+  const timestamp = formatTime(Date.now());
 
   const entry = {
     time: timestamp,
     nhiet_do: newData.nhiet_do ?? null,
     do_am_khong_khi: newData.do_am_khong_khi ?? null,
     do_am_dat: newData.do_am_dat ?? null,
+    anh_sang: newData.anh_sang ?? null,
     muc_nuoc: newData.muc_nuoc ?? null,
   };
 
@@ -29,12 +34,34 @@ export function addToHistory(prevHistory, newData) {
   return updated;
 }
 
+export function buildHistoryFromFirebase(historyData) {
+  if (!historyData || typeof historyData !== 'object') return [];
+
+  const entries = Object.values(historyData)
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => {
+      const ts = item.ts || Date.now();
+      return {
+        ts,
+        time: formatTime(ts),
+        nhiet_do: item.nhiet_do ?? item.temp ?? null,
+        do_am_khong_khi: item.do_am_khong_khi ?? item.humi ?? null,
+        do_am_dat: item.do_am_dat ?? item.soil ?? null,
+        anh_sang: item.anh_sang ?? item.lux ?? null,
+        muc_nuoc: item.muc_nuoc ?? item.distance ?? null,
+      };
+    });
+
+  return entries.sort((a, b) => a.ts - b.ts).slice(-MAX_HISTORY);
+}
+
 export function getChartData(history) {
   return history.map((item) => ({
     time: item.time,
     'Nhiệt độ (°C)': item.nhiet_do,
     'Độ ẩm KK (%)': item.do_am_khong_khi,
     'Độ ẩm đất (%)': item.do_am_dat,
+    'Ánh sáng (lux)': item.anh_sang,
     'Mực nước (cm)': item.muc_nuoc,
   }));
 }

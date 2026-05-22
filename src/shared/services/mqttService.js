@@ -1,18 +1,57 @@
 import mqtt from 'mqtt';
 
-const MQTT_URL = 'wss://916cc55df8ed4fa2bfff8e4d25fd0f56.s1.eu.hivemq.cloud:8884/mqtt';
+const MQTT_URL =
+  process.env.REACT_APP_MQTT_URL ||
+  'wss://916cc55df8ed4fa2bfff8e4d25fd0f56.s1.eu.hivemq.cloud:8884/mqtt';
 const MQTT_OPTIONS = {
-  username: 'location',
-  password: 'Abc12345',
-  clientId: `iot_web_${Math.random().toString(16).slice(2, 10)}`,
+  username: process.env.REACT_APP_MQTT_USERNAME || 'location',
+  password: process.env.REACT_APP_MQTT_PASSWORD || 'Abc12345',
+  clientId:
+    process.env.REACT_APP_MQTT_CLIENT_ID ||
+    `iot_web_${Math.random().toString(16).slice(2, 10)}`,
   clean: true,
   reconnectPeriod: 3000,
   connectTimeout: 10000,
 };
 
+const normalizeSensorPayload = (data) => {
+  if (!data || typeof data !== 'object') return data;
+
+  const normalized = { ...data };
+
+  if (data.soil !== undefined && normalized.do_am_dat === undefined) {
+    normalized.do_am_dat = data.soil;
+  }
+  if (data.temp !== undefined && normalized.nhiet_do === undefined) {
+    normalized.nhiet_do = data.temp;
+  }
+  if (data.humi !== undefined && normalized.do_am_khong_khi === undefined) {
+    normalized.do_am_khong_khi = data.humi;
+  }
+  if (data.lux !== undefined && normalized.anh_sang === undefined) {
+    normalized.anh_sang = data.lux;
+  }
+  if (data.distance !== undefined && normalized.muc_nuoc === undefined) {
+    normalized.muc_nuoc = data.distance;
+  }
+
+  if (data.config !== undefined && normalized.has_config === undefined) {
+    normalized.has_config = data.config;
+  }
+  if (data.auto !== undefined && normalized.auto_mode === undefined) {
+    normalized.auto_mode = data.auto ? 'BAT' : 'TAT';
+  }
+  if (data.pump !== undefined && normalized.trang_thai_bom === undefined) {
+    normalized.trang_thai_bom = data.pump ? 'DANG_TUOI' : 'KHONG_TUOI';
+  }
+
+  return normalized;
+};
+
 export const TOPICS = {
   SENSOR: 'esp32/sensor',
   CONTROL: 'esp32/control',
+  CONFIG: 'esp32/config',
 };
 
 class MqttService {
@@ -32,7 +71,7 @@ class MqttService {
     this.client.on('connect', () => {
       this.connected = true;
       this.connecting = false;
-      console.log('[MQTT] Connected to HiveMQ');
+      console.log('[MQTT] Da ket noi HiveMQ');
       this.client.subscribe(TOPICS.SENSOR, (err) => {
         if (err) console.error('[MQTT] Subscribe error:', err);
         else console.log(`[MQTT] Subscribed to ${TOPICS.SENSOR}`);
@@ -45,7 +84,7 @@ class MqttService {
       if (topic === TOPICS.SENSOR) {
         try {
           const data = JSON.parse(message.toString());
-          this._emit('sensor', data);
+          this._emit('sensor', normalizeSensorPayload(data));
         } catch (e) {
           console.error('[MQTT] Parse error:', e, 'raw:', message.toString());
         }
@@ -53,17 +92,20 @@ class MqttService {
     });
 
     this.client.on('reconnect', () => {
+      console.log('[MQTT] Dang ket noi lai...');
       this._emit('status', 'reconnecting');
     });
 
     this.client.on('disconnect', () => {
       this.connected = false;
+      console.log('[MQTT] Mat ket noi');
       this._emit('connect', false);
       this._emit('status', 'disconnected');
     });
 
     this.client.on('offline', () => {
       this.connected = false;
+      console.log('[MQTT] Ngoai tuyen');
       this._emit('connect', false);
       this._emit('status', 'offline');
     });
@@ -81,10 +123,22 @@ class MqttService {
     if (this.client && this.connected) {
       this.client.publish(TOPICS.CONTROL, command, { qos: 1 }, (err) => {
         if (err) console.error('[MQTT] Publish error:', err);
-        else console.log(`[MQTT] Published to ${TOPICS.CONTROL}: ${command}`);
+        else console.log(`[MQTT] Da gui len ${TOPICS.CONTROL}: ${command}`);
       });
     } else {
-      console.warn('[MQTT] Cannot publish: not connected');
+      console.warn('[MQTT] Khong the gui: chua ket noi');
+    }
+  }
+
+  publishConfig(config) {
+    if (this.client && this.connected) {
+      const payload = JSON.stringify(config);
+      this.client.publish(TOPICS.CONFIG, payload, { qos: 1 }, (err) => {
+        if (err) console.error('[MQTT] Publish config error:', err);
+        else console.log(`[MQTT] Da gui len ${TOPICS.CONFIG}: ${payload}`);
+      });
+    } else {
+      console.warn('[MQTT] Khong the gui config: chua ket noi');
     }
   }
 

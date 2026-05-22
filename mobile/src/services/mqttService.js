@@ -10,6 +10,40 @@ const MQTT_OPTIONS = {
   connectTimeout: 10000,
 };
 
+const normalizeSensorPayload = (data) => {
+  if (!data || typeof data !== 'object') return data;
+
+  const normalized = { ...data };
+
+  if (data.soil !== undefined && normalized.do_am_dat === undefined) {
+    normalized.do_am_dat = data.soil;
+  }
+  if (data.temp !== undefined && normalized.nhiet_do === undefined) {
+    normalized.nhiet_do = data.temp;
+  }
+  if (data.humi !== undefined && normalized.do_am_khong_khi === undefined) {
+    normalized.do_am_khong_khi = data.humi;
+  }
+  if (data.lux !== undefined && normalized.anh_sang === undefined) {
+    normalized.anh_sang = data.lux;
+  }
+  if (data.distance !== undefined && normalized.muc_nuoc === undefined) {
+    normalized.muc_nuoc = data.distance;
+  }
+
+  if (data.config !== undefined && normalized.has_config === undefined) {
+    normalized.has_config = data.config;
+  }
+  if (data.auto !== undefined && normalized.auto_mode === undefined) {
+    normalized.auto_mode = data.auto ? 'BAT' : 'TAT';
+  }
+  if (data.pump !== undefined && normalized.trang_thai_bom === undefined) {
+    normalized.trang_thai_bom = data.pump ? 'DANG_TUOI' : 'KHONG_TUOI';
+  }
+
+  return normalized;
+};
+
 export const TOPICS = {
   SENSOR: 'esp32/sensor',
   CONTROL: 'esp32/control',
@@ -42,7 +76,7 @@ class MqttService {
       if (topic === TOPICS.SENSOR) {
         try {
           const data = JSON.parse(message.toString());
-          this._emit('sensor', data);
+          this._emit('sensor', normalizeSensorPayload(data));
         } catch (e) {
           console.error('[MQTT Mobile] Parse error:', e);
         }
