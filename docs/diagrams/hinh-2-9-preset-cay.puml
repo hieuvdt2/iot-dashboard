@@ -1,0 +1,35 @@
+@startuml
+' Hình 2.9 - Luồng cấu hình mẫu cây trồng (mục 2.5.4)
+' Render: https://www.plantuml.com/plantuml/uml/
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam activityBackgroundColor #FAFAFA
+skinparam activityBorderColor #37474F
+
+|Admin|
+start
+
+:Chọn loại cây / preset\n(Rau, Lan, preset tùy chỉnh...);
+
+:Nạp ngưỡng lên form\n(applyPreset / setThresholds);
+
+if (Cần chỉnh sửa?) then (có)
+  :Điều chỉnh minSoil, maxTemp, ...;
+else (không)
+endif
+
+:saveConfig\n-> Firebase devices/esp32_01/config;
+
+:publishConfig\n-> topic esp32/config;
+
+|ESP32|
+:Subscribe và áp dụng\nngưỡng mới;
+
+|Admin|
+:Thông báo thành công,\ncập nhật UI;
+
+stop
+
+@enduml

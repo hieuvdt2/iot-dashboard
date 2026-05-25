@@ -1,0 +1,68 @@
+@startuml hinh_2_1_use_case_compact
+' Hinh 2.1 - Ban tong hop (1 trang) - neu can gon hon dung 2.1a + 2.1b
+' Khuyen nghi bao cao: tach Hinh 2.1a va 2.1b de de doc hon
+
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam linetype ortho
+skinparam nodesep 20
+skinparam ranksep 28
+
+title Hinh 2.1 - Use case tong quat (ban gon)
+
+left to right direction
+
+actor Admin as A #E3F2FD
+actor Viewer as V #E8F5E9
+actor ESP32 as E #FFF3E0
+
+rectangle SYS {
+
+  package "Xem du lieu" #FFF9C4 {
+    (F1 Giam sat) as f1
+    (F2 Lich su) as f2
+    (F3 Canh bao) as f3
+    (F4 Trang thai vuon) as f4
+  }
+
+  package "Admin only" #FFECB3 {
+    (F5 Bom) as f5
+    (F6 AUTO) as f6
+    (F7 Nguong) as f7
+    (F8 Mau cay) as f8
+    (F10 Phan quyen) as f10
+  }
+
+  package "Chung" #E1BEE7 {
+    (F9 Dang nhap) as f9
+    (F11 Da nen tang) as f11
+  }
+}
+
+A --> f1
+A --> f2
+A --> f3
+A --> f4
+A --> f5
+A --> f6
+A --> f7
+A --> f8
+A --> f9
+A --> f10
+A --> f11
+
+V --> f1
+V --> f2
+V --> f3
+V --> f4
+V --> f9
+V --> f11
+
+E --> f1 : publish
+E --> f5
+E --> f6
+E --> f7 : config
+
+@enduml

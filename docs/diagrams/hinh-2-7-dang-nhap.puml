@@ -1,0 +1,27 @@
+@startuml
+' Hình 2.7 - Luồng đăng nhập (mục 2.5.2)
+' Render: https://www.plantuml.com/plantuml/uml/
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam sequenceMessageAlign center
+
+actor "Người dùng" as U
+participant "Web App" as APP
+participant "Firebase\nAuthentication" as AUTH
+database "Realtime DB\nroles/uid" as DB
+
+U -> APP : 1. Nhập email, mật khẩu
+APP -> AUTH : 2. signIn / xác thực
+AUTH --> APP : 3. trả về uid
+APP -> DB : 4. đọc roles/uid
+DB --> APP : admin hoặc viewer
+APP --> U : 5. Giao diện\ntheo quyền user
+
+note right of APP #E3F2FD
+  Chi tiết nhánh admin/viewer
+  xem Hình 2.5 (mục 2.4.2)
+end note
+
+@enduml

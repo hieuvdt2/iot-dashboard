@@ -1,0 +1,82 @@
+@startuml hinh_2_2_kien_truc_phan_mem
+' Hình 2.2 - Kiến trúc phần mềm tổng thể
+' Render: https://www.plantuml.com/plantuml/uml/
+
+skinparam shadowing false
+skinparam roundcorner 10
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam linetype ortho
+skinparam componentStyle rectangle
+skinparam nodesep 72
+skinparam ranksep 68
+skinparam padding 12
+skinparam packagePadding 28
+skinparam componentPadding 16
+skinparam noteMargin 18
+
+title Hình 2.2 - Sơ đồ kiến trúc phần mềm tổng thể
+
+top to bottom direction
+
+together {
+  package "Ứng dụng client" as PKG_CLI #E3F2FD {
+    component "Web App\n(React)" as WEB
+    component "Mobile App\n(Expo)" as MOB
+    component "Desktop App\n(Electron)" as DESK
+    WEB -[hidden]right- MOB
+    MOB -[hidden]right- DESK
+  }
+}
+
+package "MQTT Broker" as PKG_MQ #E8F5E9 {
+  component "HiveMQ Cloud" as BROKER
+}
+
+together {
+  package "Nền tảng Firebase" as PKG_FB #FFF3E0 {
+    database "Realtime Database\nlatest / history / config" as RTDB
+    component "Authentication\nemail / phân quyền" as AUTH
+    RTDB -[hidden]right- AUTH
+  }
+}
+
+component "ESP32\n(Firmware Arduino)" as ESP #FFF8E1
+component "Server Node.js\n(tùy chọn)" as SRV #ECEFF1
+
+PKG_CLI -[hidden]right--- PKG_FB
+ESP -[hidden]left--- PKG_MQ
+
+' Dãn thêm theo trục dọc giữa các tầng (giữ bố cục)
+ESP -[hidden]down---- BROKER
+BROKER -[hidden]down---- SRV
+SRV -[hidden]down---- RTDB
+
+' --- Luồng chính ---
+ESP -down-> BROKER : Wi-Fi\npublish / subscribe
+WEB -down-> BROKER : WSS\nsubscribe + publish
+MOB -down-> BROKER : MQTT\nsubscribe + publish
+
+DESK -down-> WEB : nhúng giao diện Web
+
+WEB -down-> RTDB : đọc / ghi\ncấu hình, lịch sử
+WEB -down-> AUTH : đăng nhập
+
+MOB .down.> RTDB : (tùy phiên bản;\nchủ yếu realtime MQTT)
+
+' --- Tùy chọn ---
+BROKER .down.> SRV : subscribe\nesp32/sensor
+SRV .down.> RTDB : ghi latest,\nhistory
+
+note right of SRV #F5F5F5
+  Server bridge là tùy chọn.
+  Không bắt buộc để Web/Mobile
+  xem realtime qua MQTT.
+end note
+
+note bottom of PKG_CLI #E3F2FD
+  Luồng khuyến nghị: ESP32 → MQTT → Client;
+  Web đồng thời đọc Firebase (latest, history, config).
+end note
+
+@enduml

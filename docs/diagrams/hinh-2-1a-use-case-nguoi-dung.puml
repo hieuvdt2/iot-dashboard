@@ -1,0 +1,63 @@
+@startuml hinh_2_1a_use_case_nguoi_dung
+' Hình 2.1a - Use case người dùng (tiếng Việt có dấu)
+' Render: https://www.plantuml.com/plantuml/uml/ (dán UTF-8)
+
+skinparam shadowing false
+skinparam roundcorner 10
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam linetype ortho
+skinparam nodesep 30
+skinparam ranksep 50
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor white
+  BorderColor #37474F
+}
+
+title Hình 2.1a - Use case người dùng (Admin / Viewer)
+
+left to right direction
+
+actor "Quản trị viên\n(Admin)" as admin #BBDEFB
+actor "Người xem\n(Viewer)" as viewer #C8E6C9
+
+rectangle "Ứng dụng Vườn Thông Minh\n(Web / Mobile / Desktop)" as SYS #FAFAFA {
+
+  package "Giám sát và cảnh báo" as P1 #FFFDE7 {
+    usecase "Giám sát\nthời gian thực" as UC1
+    usecase "Tra cứu\nlịch sử theo ngày" as UC2
+    usecase "Cảnh báo\nngưỡng môi trường" as UC3
+    usecase "Đánh giá\ntình trạng vườn" as UC4
+    UC4 ..> UC3 : <<include>>
+  }
+
+  package "Điều khiển và cấu hình\n(chỉ Quản trị viên)" as P2 #FFF3E0 {
+    usecase "Bật / tắt\nmáy bơm" as UC5
+    usecase "Chế độ\ntưới tự động (AUTO)" as UC6
+    usecase "Cấu hình\nngưỡng cảnh báo" as UC7
+    usecase "Chọn mẫu cấu hình\ntheo loại cây" as UC8
+  }
+
+  package "Tài khoản và nền tảng" as P3 #F3E5F5 {
+    usecase "Đăng nhập /\nđăng ký" as UC9
+    usecase "Quản lý\nphân quyền" as UC10
+    usecase "Sử dụng trên\nWeb, Mobile, Desktop" as UC11
+    usecase "Xem dữ liệu\nđồng bộ từ cloud" as UC12
+  }
+}
+
+admin --> P1
+admin --> P2
+admin --> P3
+
+viewer --> P1
+viewer --> P3
+
+note bottom of P2 #FFF3E0
+  Người xem không được:
+  điều khiển bơm, AUTO,
+  sửa ngưỡng, quản lý user
+end note
+
+@enduml

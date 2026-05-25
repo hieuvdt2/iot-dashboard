@@ -1,0 +1,51 @@
+@startuml
+' Hình 2.5 - Sequence phân quyền Admin / Viewer (mục 2.4.2)
+' Render: https://www.plantuml.com/plantuml/uml/ (dán UTF-8)
+
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+title Hình 2.5 - Phân quyền Admin / Viewer sau đăng nhập
+
+actor "Người dùng" as USER
+participant "Trang đăng nhập\n(LoginPage)" as LOGIN
+participant "Web App\n(App.js)" as APP
+participant "Firebase\nAuthentication" as AUTH
+database "Realtime DB\nroles / uid" as RTDB
+
+== Đăng nhập ==
+USER -> LOGIN : Nhập email, mật khẩu
+LOGIN -> APP : signIn(email, password)
+APP -> AUTH : xác thực
+AUTH --> APP : trả về uid
+APP --> LOGIN : đăng nhập thành công
+
+== Xác định quyền ==
+APP -> RTDB : subscribeRole(uid)\nđọc roles/uid
+RTDB --> APP : "admin" hoặc "viewer"
+APP -> APP : canEdit, canControl\n= (role === admin)
+
+alt role = admin
+  APP --> USER : Giao diện đầy đủ
+  note right of APP #E8F5E9
+    **Admin**
+    • Điều khiển bơm (MQTT control)
+    • Bật/tắt AUTO
+    • Cấu hình ngưỡng, preset
+    • Trang /admin quản lý user
+  end note
+else role = viewer
+  APP --> USER : Chỉ xem dữ liệu
+  note right of APP #FFEBEE
+    **Viewer**
+    • subscribe latest, history
+    • Không publish control/config
+    • Ẩn /admin và form cấu hình
+  end note
+end
+
+@enduml

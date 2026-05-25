@@ -1,0 +1,49 @@
+@startuml
+' Hình 2.4 - Cây dữ liệu Firebase Realtime Database
+' Render: https://www.plantuml.com/plantuml/uml/ (dán UTF-8)
+
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam packageStyle rectangle
+skinparam nodesep 30
+skinparam ranksep 28
+
+title Hình 2.4 - Cây dữ liệu Firebase Realtime Database
+
+top to bottom direction
+
+package "Firebase Realtime Database" #FFF8E1 {
+
+  package "devices/" #E3F2FD {
+    package "esp32_01/" #E8F5E9 {
+
+      rectangle "latest/\n(JSON cảm biến mới nhất)" as LATEST #FFFFFF
+      rectangle "config/\n(ngưỡng: minSoil, targetSoil, ...)" as CONFIG #FFFFFF
+
+      package "history/" #FFF3E0 {
+        rectangle "YYYY-MM-DD/" as HDAY #FFFFFF
+        rectangle "timestamp/\n(bản ghi lịch sử)" as HTS #FFFFFF
+        HDAY -[hidden]down- HTS
+      }
+
+      package "presets/" #F3E5F5 {
+        rectangle "presetKey/\n(mẫu cấu hình cây)" as PRE #FFFFFF
+      }
+
+      LATEST -[hidden]down- CONFIG
+      CONFIG -[hidden]down- HDAY
+    }
+  }
+
+  package "users/" #E1F5FE {
+    rectangle "uid/\n(email, createdAt, ...)" as USERS #FFFFFF
+  }
+
+  package "roles/" #FFEBEE {
+    rectangle "uid/\n(admin | viewer)" as ROLES #FFFFFF
+  }
+}
+
+@enduml
