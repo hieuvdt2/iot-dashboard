@@ -1,29 +1,32 @@
 {
   "expo": {
     "name": "IoT Dashboard",
-    "slug": "iot-dashboard",
+    "slug": "iot-dashboard-esp32",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0d1117"
+    "backgroundColor": "#0d1117",
+    "android": {
+      "package": "com.iot.dashboard",
+      "adaptiveIcon": {
+        "backgroundColor": "#0d1117"
+      },
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.iot.dashboard"
     },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0d1117"
-      },
-      "package": "com.iot.dashboard"
+    "newArchEnabled": true,
+    "plugins": [],
+    "extra": {
+      "eas": {
+        "projectId": "12392a42-8d78-415c-a31e-76a55e9beff1"
+      }
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    }
+    "owner": "hieuvdt2"
   }
 }

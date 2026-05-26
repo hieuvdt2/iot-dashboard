@@ -376,6 +376,7 @@ function DashboardPage({
   onClearHistory,
   canControl,
   thresholds = {},
+  maxWaterDistance = 20,
 }) {
   const displayedHistory = [...history].reverse().slice(0, historyFilter);
 
@@ -384,6 +385,20 @@ function DashboardPage({
   const soilHum = sensorData?.do_am_dat ?? null;
   const light = sensorData?.anh_sang ?? null;
   const water = sensorData?.muc_nuoc ?? null;
+
+  // Water level: small distance = full, large distance = empty
+  const waterStatus = water === null ? null
+    : water <= maxWaterDistance * 0.5  ? 'full'
+    : water <= maxWaterDistance        ? 'low'
+    : 'empty';
+  const waterPct = water !== null
+    ? Math.min(100, Math.max(0, Math.round((1 - water / maxWaterDistance) * 100)))
+    : null;
+  const waterStatusMeta = {
+    full:  { label: 'Đủ nước', color: '#16a34a', bg: '#dcfce7', border: '#86efac', icon: '✓' },
+    low:   { label: 'Thấp',    color: '#d97706', bg: '#fef9c3', border: '#fde047', icon: '⚠' },
+    empty: { label: 'Cạn',     color: '#dc2626', bg: '#fef2f2', border: '#fca5a5', icon: '✗' },
+  }[waterStatus] ?? null;
 
   /* Pump */
   const pumpOn = pumpStatus === 'DANG_TUOI';
@@ -394,7 +409,7 @@ function DashboardPage({
       {!configReady && (
         <div className="info-banner">
           <div className="info-title">Chưa cấu hình cây trồng</div>
-          <div className="info-subtitle">Vui lòng chọn preset hoặc lưu cấu hình tùy chỉnh để bắt đầu phân tích.</div>
+          <div className="info-subtitle">Vui lòng chọn mẫu hoặc lưu cấu hình tùy chỉnh để bắt đầu phân tích.</div>
         </div>
       )}
       {alerts.length > 0 && configReady && (
@@ -512,6 +527,53 @@ function DashboardPage({
               {pumpOn ? 'Máy bơm đang hoạt động' : 'Máy bơm đang tắt'}
             </p>
           </div>
+
+          {/* ── Water level indicator ── */}
+          <div style={{
+            marginTop: 12, padding: '12px 14px',
+            background: waterStatusMeta ? waterStatusMeta.bg : 'var(--bg)',
+            border: `1px solid ${waterStatusMeta ? waterStatusMeta.border : 'var(--border)'}`,
+            borderRadius: 10,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                🪣 Bể nước
+              </span>
+              {waterStatusMeta ? (
+                <span style={{
+                  fontSize: '0.75rem', fontWeight: 700,
+                  color: waterStatusMeta.color,
+                  background: 'rgba(255,255,255,0.7)',
+                  padding: '2px 9px', borderRadius: 999,
+                  border: `1px solid ${waterStatusMeta.border}`,
+                }}>
+                  {waterStatusMeta.icon} {waterStatusMeta.label}
+                </span>
+              ) : (
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-3)' }}>--</span>
+              )}
+            </div>
+
+            {/* Progress bar */}
+            <div style={{ background: 'rgba(0,0,0,0.08)', borderRadius: 999, height: 8, overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', borderRadius: 999,
+                width: `${waterPct ?? 0}%`,
+                background: waterStatus === 'full'  ? 'linear-gradient(90deg,#4ade80,#22c55e)'
+                          : waterStatus === 'low'   ? 'linear-gradient(90deg,#fcd34d,#f59e0b)'
+                          : waterStatus === 'empty' ? 'linear-gradient(90deg,#fca5a5,#ef4444)'
+                          : '#e5e7eb',
+                transition: 'width 0.5s ease',
+              }} />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5, fontSize: '0.72rem', color: 'var(--text-2)' }}>
+              <span>{water !== null ? `${water} cm` : '--'}</span>
+              <span style={{ fontWeight: 700, color: waterStatusMeta?.color ?? 'var(--text-3)' }}>
+                {waterPct !== null ? `${waterPct}%` : '--'}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Chart */}
@@ -579,7 +641,7 @@ function DashboardPage({
               ) : (
                 <tr>
                   <td colSpan={7} className="no-data">
-                    Chưa có dữ liệu — thử đổi ngày hoặc kiểm tra ESP32...
+                    Chưa có dữ liệu — thử đổi ngày hoặc kiểm tra thiết bị...
                   </td>
                 </tr>
               )}

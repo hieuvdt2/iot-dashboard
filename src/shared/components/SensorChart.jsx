@@ -55,7 +55,7 @@ function SensorChart({ history }) {
 
       {chartData.length === 0 ? (
         <div className="chart-empty">
-          <p>Đang chờ dữ liệu từ ESP32...</p>
+          <p>Đang chờ dữ liệu từ thiết bị...</p>
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={240}>

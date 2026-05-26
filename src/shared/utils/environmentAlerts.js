@@ -104,7 +104,8 @@ const buildWaterAlert = (water, maxWaterDistance) => {
   };
 };
 
-export function buildEnvironmentAlerts(sensorData, thresholds = {}) {
+// maxWaterDistance là cài đặt thiết bị, không phải ngưỡng cây trồng nên truyền riêng
+export function buildEnvironmentAlerts(sensorData, thresholds = {}, maxWaterDistance = 20) {
   if (!sensorData) return [];
 
   const {
@@ -112,7 +113,6 @@ export function buildEnvironmentAlerts(sensorData, thresholds = {}) {
     maxTemp = 35,
     minAirHum = 50,
     maxLux = 20000,
-    maxWaterDistance = 20,
   } = thresholds;
 
   return [

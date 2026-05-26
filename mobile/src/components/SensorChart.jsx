@@ -29,7 +29,7 @@ function SensorChart({ history }) {
       {!chartData || history.length < 2 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyIcon}>📡</Text>
-          <Text style={styles.emptyText}>Đang chờ dữ liệu từ ESP32...</Text>
+          <Text style={styles.emptyText}>Đang chờ dữ liệu từ thiết bị...</Text>
         </View>
       ) : (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
