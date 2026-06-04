@@ -14,7 +14,7 @@ const MQTT_OPTIONS = {
   connectTimeout: 10000,
 };
 
-const normalizeSensorPayload = (data) => {
+export const normalizeSensorPayload = (data) => {
   if (!data || typeof data !== 'object') return data;
 
   const normalized = { ...data };

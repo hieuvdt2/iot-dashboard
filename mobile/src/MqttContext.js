@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import MqttService from './services/mqttService';
+import { firebaseService } from './services/firebaseService';
+import { normalizeSensorPayload } from './utils/normalizeSensor';
 
 const MqttContext = createContext(null);
 
@@ -41,7 +43,17 @@ export function MqttProvider({ children }) {
     });
 
     mqtt.connect();
-    return () => mqtt.disconnect();
+
+    const unsubFirebase = firebaseService.subscribeLatest((data) => {
+      if (!data) return;
+      const n = normalizeSensorPayload(data);
+      setSensorData((prev) => ({ ...prev, ...n }));
+    });
+
+    return () => {
+      unsubFirebase();
+      mqtt.disconnect();
+    };
   }, []);
 
   const publishControl = useCallback((cmd) => {

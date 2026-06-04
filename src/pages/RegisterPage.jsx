@@ -1,11 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 
-function RegisterPage({ onSignUp, authError }) {
+function RegisterPage({ onSignUp, authError, authUser, authLoading }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!authLoading && authUser) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [authUser, authLoading, navigate]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -13,7 +19,7 @@ function RegisterPage({ onSignUp, authError }) {
     setSubmitting(true);
     try {
       await onSignUp(email, password);
-      navigate('/');
+      navigate('/dashboard', { replace: true });
     } finally {
       setSubmitting(false);
     }

@@ -6,9 +6,13 @@ import {
   off,
   set,
   remove,
+  get,
 } from 'firebase/database';
 import {
   getAuth,
+  initializeAuth,
+  browserLocalPersistence,
+  setPersistence,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -38,11 +42,71 @@ const DEVICE_ID = process.env.REACT_APP_DEVICE_ID || 'esp32_01';
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-const auth = getAuth(app);
 
-console.log('[Firebase] Khoi tao thanh cong');
+/** Lưu phiên đăng nhập trong trình duyệt (localStorage/IndexedDB) — không mất khi reload tab */
+function createAuth() {
+  try {
+    return initializeAuth(app, { persistence: browserLocalPersistence });
+  } catch (e) {
+    if (e?.code === 'auth/already-initialized') {
+      const existing = getAuth(app);
+      setPersistence(existing, browserLocalPersistence).catch(() => {});
+      return existing;
+    }
+    throw e;
+  }
+}
+
+const auth = createAuth();
+
+console.log('[Firebase] Auth persistence: local (giữ đăng nhập sau khi reload)');
 
 const withDevicePath = (path) => `devices/${DEVICE_ID}/${path}`;
+
+/** Ghi hồ sơ vào RTDB nếu thiếu (đăng nhập cũ / tạo tay trên Console). */
+async function ensureUserProfile(user) {
+  if (!user?.uid) return;
+  const profileRef = ref(db, `users/${user.uid}`);
+  const snap = await get(profileRef);
+  if (!snap.exists()) {
+    await set(profileRef, {
+      email: user.email || '',
+      createdAt: Date.now(),
+    });
+  } else {
+    const existing = snap.val() || {};
+    if (!existing.email && user.email) {
+      await set(profileRef, { ...existing, email: user.email });
+    }
+  }
+  const roleRef = ref(db, `roles/${user.uid}`);
+  const roleSnap = await get(roleRef);
+  if (!roleSnap.exists()) {
+    await set(roleRef, 'viewer');
+  }
+}
+
+/** Gộp users + roles để admin thấy cả tài khoản chỉ có quyền trong roles. */
+export function mergeUserEntries(users = {}, roles = {}) {
+  const uids = new Set([
+    ...Object.keys(users || {}),
+    ...Object.keys(roles || {}),
+  ]);
+  return [...uids].map((uid) => {
+    const profile = users?.[uid];
+    const rawRole = roles?.[uid];
+    const role =
+      typeof rawRole === 'string'
+        ? rawRole
+        : rawRole?.role || 'viewer';
+    return {
+      uid,
+      email: profile?.email || rawRole?.email || '',
+      role,
+      hasProfile: Boolean(profile?.email || profile?.createdAt),
+    };
+  }).sort((a, b) => (a.email || a.uid).localeCompare(b.email || b.uid));
+}
 
 export const firebaseService = {
   onAuthStateChanged(callback) {
@@ -50,20 +114,19 @@ export const firebaseService = {
   },
 
   async signIn(email, password) {
-    return signInWithEmailAndPassword(auth, email, password);
+    const credential = await signInWithEmailAndPassword(auth, email, password);
+    await ensureUserProfile(credential.user);
+    return credential;
   },
 
   async signUp(email, password) {
     const credential = await createUserWithEmailAndPassword(auth, email, password);
-    const user = credential.user;
-    const profileRef = ref(db, `users/${user.uid}`);
-    await set(profileRef, {
-      email: user.email,
-      createdAt: Date.now(),
-    });
-    const roleRef = ref(db, `roles/${user.uid}`);
-    await set(roleRef, 'viewer');
+    await ensureUserProfile(credential.user);
     return credential;
+  },
+
+  async ensureUserProfile(user) {
+    return ensureUserProfile(user);
   },
 
   async signOut() {
@@ -81,6 +144,27 @@ export const firebaseService = {
       if (onError) onError(err);
     });
     return () => off(latestRef, 'value', handler);
+  },
+
+  /** One-shot fetch for multiple YYYY-MM-DD date keys — returns raw entries sorted by ts */
+  async getHistoryForDates(dateKeys) {
+    const allEntries = [];
+    await Promise.all(
+      dateKeys.map(async (dateKey) => {
+        try {
+          const snapshot = await get(ref(db, withDevicePath(`history/${dateKey}`)));
+          const val = snapshot.val();
+          if (val) {
+            Object.values(val).forEach((raw) => {
+              if (raw && (raw.ts || raw.timestamp)) allEntries.push(raw);
+            });
+          }
+        } catch (e) {
+          console.warn('[Firebase] getHistoryForDates', dateKey, e.message);
+        }
+      })
+    );
+    return allEntries.sort((a, b) => (a.ts || 0) - (b.ts || 0));
   },
 
   subscribeHistory(dateKey, callback, onError) {
@@ -127,21 +211,27 @@ export const firebaseService = {
     return () => off(roleRef, 'value', handler);
   },
 
-  subscribeRoles(callback) {
+  subscribeRoles(callback, onError) {
     const rolesRef = ref(db, 'roles');
     const handler = (snapshot) => {
       callback(snapshot.val() || {});
     };
-    onValue(rolesRef, handler);
+    onValue(rolesRef, handler, (err) => {
+      console.error('[Firebase] subscribeRoles:', err);
+      if (onError) onError(err);
+    });
     return () => off(rolesRef, 'value', handler);
   },
 
-  subscribeUsers(callback) {
+  subscribeUsers(callback, onError) {
     const usersRef = ref(db, 'users');
     const handler = (snapshot) => {
       callback(snapshot.val() || {});
     };
-    onValue(usersRef, handler);
+    onValue(usersRef, handler, (err) => {
+      console.error('[Firebase] subscribeUsers:', err);
+      if (onError) onError(err);
+    });
     return () => off(usersRef, 'value', handler);
   },
 

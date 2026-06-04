@@ -1,28 +1,25 @@
-import './global'; // Polyfill Buffer, process — phải đứng đầu tiên
+import "./global"; // Polyfill Buffer, process — phải đứng đầu tiên
 
-import React, { useState, useEffect } from 'react';
-import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import React, { useState, useEffect } from "react";
+import { View, ActivityIndicator, StyleSheet, Text } from "react-native";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { NavigationContainer } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 
-import { firebaseService } from './src/services/firebaseService';
-import { MqttProvider } from './src/MqttContext';
-import { C } from './src/theme';
+import { firebaseService } from "./src/services/firebaseService";
+import { MqttProvider } from "./src/MqttContext";
+import { C } from "./src/theme";
 
-import LoginScreen    from './src/screens/LoginScreen';
-import RegisterScreen from './src/screens/RegisterScreen';
-import DashboardScreen from './src/screens/DashboardScreen';
-import ConfigScreen   from './src/screens/ConfigScreen';
+import LoginScreen    from "./src/screens/LoginScreen";
+import RegisterScreen from "./src/screens/RegisterScreen";
+import DashboardScreen from "./src/screens/DashboardScreen";
+import ConfigScreen   from "./src/screens/ConfigScreen";
+import ControlScreen  from "./src/screens/ControlScreen";
+import AccountScreen  from "./src/screens/AccountScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab   = createBottomTabNavigator();
-
-function TabIcon({ icon, focused }) {
-  return (
-    <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.5 }}>{icon}</Text>
-  );
-}
 
 function MainTabs() {
   return (
@@ -30,31 +27,56 @@ function MainTabs() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: C.bgCard,
-          borderTopColor: C.border,
+          backgroundColor: "#ffffff",
+          borderTopColor: "#d4e8dc",
           borderTopWidth: 1,
-          height: 60,
+          height: 64,
           paddingBottom: 8,
+          paddingTop: 6,
         },
-        tabBarActiveTintColor:   C.greenDark,
-        tabBarInactiveTintColor: C.text3,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarActiveTintColor:   "#16a34a",
+        tabBarInactiveTintColor: "#9ca3af",
+        tabBarLabelStyle: { fontSize: 10, fontWeight: "600" },
       }}
     >
       <Tab.Screen
         name="Dashboard"
         component={DashboardScreen}
         options={{
-          tabBarLabel: 'Dashboard',
-          tabBarIcon: ({ focused }) => <TabIcon icon="🏠" focused={focused} />,
+          tabBarLabel: "Tổng quan",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Control"
+        component={ControlScreen}
+        options={{
+          tabBarLabel: "Điều khiển",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="water-pump" size={size} color={color} />
+          ),
         }}
       />
       <Tab.Screen
         name="Config"
         component={ConfigScreen}
         options={{
-          tabBarLabel: 'Cấu hình',
-          tabBarIcon: ({ focused }) => <TabIcon icon="⚙️" focused={focused} />,
+          tabBarLabel: "Cài đặt",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="settings-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Account"
+        component={AccountScreen}
+        options={{
+          tabBarLabel: "Tài khoản",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person-outline" size={size} color={color} />
+          ),
         }}
       />
     </Tab.Navigator>
@@ -73,7 +95,9 @@ export default function App() {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color={C.green} />
-        <Text style={{ color: C.text2, marginTop: 12, fontSize: 14 }}>Smart Garden</Text>
+        <Text style={{ color: C.text2, marginTop: 12, fontSize: 14 }}>
+          Smart Garden
+        </Text>
       </View>
     );
   }
@@ -100,7 +124,7 @@ const styles = StyleSheet.create({
   loading: {
     flex: 1,
     backgroundColor: C.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

@@ -10,7 +10,8 @@ import EnvironmentToast from './shared/components/EnvironmentToast';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import AdminPage from './pages/AdminPage';
-import { mqttService } from './shared/services/mqttService';
+import { mqttService, normalizeSensorPayload } from './shared/services/mqttService';
+import { normalizeEntry } from './shared/utils/sensorHistory';
 import { firebaseService } from './shared/services/firebaseService';
 import {
   buildHistoryFromFirebase,
@@ -140,6 +141,7 @@ function App() {
   const userMenuRef = useRef(null);
   const [users, setUsers] = useState({});
   const [roles, setRoles] = useState({});
+  const [adminDbError, setAdminDbError] = useState(null);
   const [configReady, setConfigReady] = useState(() => {
     try {
       return Boolean(localStorage.getItem('iot_thresholds'));
@@ -183,8 +185,21 @@ function App() {
     console.log('[Env] Thong tin bien moi truong:', envSnapshot);
   }, []);
 
-  const handleSensor = useCallback((data) => {
-    setSensorData(data || null);
+  const handleSensor = useCallback((raw) => {
+    if (!raw) {
+      setSensorData(null);
+      return;
+    }
+    const n = normalizeEntry(raw);
+    const aliases = normalizeSensorPayload(raw);
+    setSensorData({
+      ...raw,
+      nhiet_do: n.nhiet_do ?? aliases.temp ?? raw.nhiet_do,
+      do_am_khong_khi: n.do_am_khong_khi ?? aliases.humi ?? raw.do_am_khong_khi,
+      do_am_dat: n.do_am_dat ?? aliases.soil ?? raw.do_am_dat,
+      anh_sang: n.anh_sang ?? aliases.lux ?? raw.anh_sang,
+      muc_nuoc: n.muc_nuoc ?? aliases.distance ?? raw.muc_nuoc,
+    });
   }, []);
 
   const handleConnect = useCallback((status) => {
@@ -198,11 +213,13 @@ function App() {
   useEffect(() => {
     mqttService.on('connect', handleConnect);
     mqttService.on('status', handleStatus);
+    mqttService.on('sensor', handleSensor);
     mqttService.connect();
 
     return () => {
       mqttService.off('connect', handleConnect);
       mqttService.off('status', handleStatus);
+      mqttService.off('sensor', handleSensor);
     };
   }, [handleSensor, handleConnect, handleStatus]);
 
@@ -282,6 +299,7 @@ function App() {
       if (roleUnsubscribe) roleUnsubscribe();
       if (user) {
         roleUnsubscribe = firebaseService.subscribeRole(user.uid, setRole);
+        firebaseService.ensureUserProfile(user).catch(() => {});
       } else {
         setRole('viewer');
       }
@@ -297,11 +315,16 @@ function App() {
     if (!authUser || role !== 'admin') {
       setUsers({});
       setRoles({});
+      setAdminDbError(null);
       return undefined;
     }
 
-    const unsubscribeUsers = firebaseService.subscribeUsers(setUsers);
-    const unsubscribeRoles = firebaseService.subscribeRoles(setRoles);
+    setAdminDbError(null);
+    const onDbError = (err) => {
+      setAdminDbError(err?.message || 'Không đọc được users/roles (kiểm tra Rules Firebase).');
+    };
+    const unsubscribeUsers = firebaseService.subscribeUsers(setUsers, onDbError);
+    const unsubscribeRoles = firebaseService.subscribeRoles(setRoles, onDbError);
 
     return () => {
       unsubscribeUsers();
@@ -647,31 +670,27 @@ function App() {
   const avatarUrl = authUser?.photoURL || null;
   const avatarInitial = displayName[0]?.toUpperCase() || '?';
 
-  /* Chờ Firebase kiểm tra session — tránh flash màn hình login */
-  if (authLoading) {
-    return (
-      <div style={{
-        height: '100vh', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-        gap: 16,
-      }}>
-        <div style={{
-          width: 48, height: 48, borderRadius: '50%',
-          border: '4px solid #e5e7eb',
-          borderTop: '4px solid #22c55e',
-          animation: 'spin 0.8s linear infinite',
-        }}/>
-        <div style={{ fontSize: '0.9rem', color: '#6b7280', fontWeight: 500 }}>
-          Đang khôi phục phiên đăng nhập...
-        </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
-  }
-
   return (
     <BrowserRouter>
+      {authLoading ? (
+        <div style={{
+          height: '100vh', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+          gap: 16,
+        }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: '50%',
+            border: '4px solid #e5e7eb',
+            borderTop: '4px solid #22c55e',
+            animation: 'spin 0.8s linear infinite',
+          }} />
+          <div style={{ fontSize: '0.9rem', color: '#6b7280', fontWeight: 500 }}>
+            Đang khôi phục phiên đăng nhập...
+          </div>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      ) : (
       <div className="app">
         {/* ===== SIDEBAR ===== */}
         <aside className="sidebar">
@@ -820,11 +839,25 @@ function App() {
             <Routes>
               <Route
                 path="/dang-nhap"
-                element={<LoginPage onSignIn={handleSignIn} authError={authError} />}
+                element={
+                  <LoginPage
+                    onSignIn={handleSignIn}
+                    authError={authError}
+                    authUser={authUser}
+                    authLoading={authLoading}
+                  />
+                }
               />
               <Route
                 path="/dang-ky"
-                element={<RegisterPage onSignUp={handleSignUp} authError={authError} />}
+                element={
+                  <RegisterPage
+                    onSignUp={handleSignUp}
+                    authError={authError}
+                    authUser={authUser}
+                    authLoading={authLoading}
+                  />
+                }
               />
               <Route
                 path="/admin"
@@ -836,6 +869,8 @@ function App() {
                       roles={roles}
                       onSetRole={handleSetRole}
                       authUser={authUser}
+                      adminDbError={adminDbError}
+                      currentRole={role}
                     />
                   ) : (
                     <Navigate to="/dang-nhap" replace />
@@ -1011,6 +1046,7 @@ function App() {
           />
         )}
       </div>
+      )}
     </BrowserRouter>
   );
 }

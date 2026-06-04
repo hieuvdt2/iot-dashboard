@@ -1,12 +1,87 @@
 export const MAX_HISTORY = 50;
 
 export const SENSOR_KEYS = [
-  { key: 'nhiet_do', label: 'Nhiệt độ (°C)', color: '#ff6b6b' },
-  { key: 'do_am_khong_khi', label: 'Độ ẩm KK (%)', color: '#4dabf7' },
-  { key: 'do_am_dat', label: 'Độ ẩm đất (%)', color: '#51cf66' },
-  { key: 'anh_sang', label: 'Ánh sáng (lux)', color: '#ffa94d' },
-  { key: 'muc_nuoc', label: 'Mực nước (cm)', color: '#ffd43b' },
+  { key: 'nhiet_do',        label: 'Nhiệt độ (°C)',   color: '#ff6b6b' },
+  { key: 'do_am_khong_khi', label: 'Độ ẩm KK (%)',    color: '#4dabf7' },
+  { key: 'do_am_dat',       label: 'Độ ẩm đất (%)',   color: '#51cf66' },
+  { key: 'anh_sang',        label: 'Ánh sáng (lux)',  color: '#ffa94d' },
+  { key: 'muc_nuoc',        label: 'Mực nước (cm)',   color: '#ffd43b' },
 ];
+
+const SENSOR_FIELDS = SENSOR_KEYS.map((s) => s.key);
+
+/** Returns last numDays days as YYYY-MM-DD strings, oldest → newest */
+export function getDateKeys(numDays) {
+  return Array.from({ length: numDays }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (numDays - 1 - i));
+    return d.toISOString().slice(0, 10);
+  });
+}
+
+/** Normalize a raw Firebase entry to standard field names */
+export function normalizeEntry(raw) {
+  return {
+    ts:               Number(raw.ts || raw.timestamp || 0),
+    nhiet_do:         raw.nhiet_do         ?? raw.temperature ?? raw.temp  ?? null,
+    do_am_khong_khi:  raw.do_am_khong_khi  ?? raw.airHumidity ?? raw.humi  ?? null,
+    do_am_dat:        raw.do_am_dat        ?? raw.soilMoisture ?? raw.soil ?? null,
+    anh_sang:         raw.anh_sang         ?? raw.light        ?? raw.lux  ?? null,
+    muc_nuoc:         raw.muc_nuoc         ?? raw.waterLevel   ?? raw.distance ?? null,
+  };
+}
+
+function makeBucket() {
+  const b = { _s: {}, _c: {} };
+  SENSOR_FIELDS.forEach((f) => { b._s[f] = 0; b._c[f] = 0; });
+  return b;
+}
+function finalizeBucket(b) {
+  const r = { time: b.time };
+  SENSOR_FIELDS.forEach((f) => {
+    r[f] = b._c[f] > 0 ? Math.round((b._s[f] / b._c[f]) * 10) / 10 : null;
+  });
+  return r;
+}
+function accumulate(bucket, entry) {
+  SENSOR_FIELDS.forEach((f) => {
+    if (entry[f] != null) { bucket._s[f] += Number(entry[f]); bucket._c[f]++; }
+  });
+}
+
+/** Aggregate entries by hour — for "hôm nay" view */
+export function aggregateHourly(entries) {
+  const buckets = new Map();
+  entries.forEach((e) => {
+    if (!e.ts) return;
+    const d = new Date(e.ts);
+    const h = d.getHours();
+    const label = `${String(h).padStart(2, '0')}:00`;
+    if (!buckets.has(h)) buckets.set(h, { ...makeBucket(), time: label });
+    accumulate(buckets.get(h), e);
+  });
+  return [...buckets.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, b]) => finalizeBucket(b));
+}
+
+const VN_DAY = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+
+/** Aggregate entries by calendar day — for "7 ngày" / "30 ngày" view */
+export function aggregateDaily(entries) {
+  const buckets = new Map();
+  entries.forEach((e) => {
+    if (!e.ts) return;
+    const d = new Date(e.ts);
+    const key = d.toISOString().slice(0, 10);
+    const label = `${VN_DAY[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`;
+    if (!buckets.has(key)) buckets.set(key, { ...makeBucket(), time: label });
+    accumulate(buckets.get(key), e);
+  });
+  return [...buckets.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([, b]) => finalizeBucket(b));
+}
 
 const formatTime = (ts) =>
   new Date(ts).toLocaleTimeString('vi-VN', {

@@ -582,7 +582,7 @@ function DashboardPage({
             <h3>Biểu đồ dữ liệu cảm biến</h3>
             <button className="btn-chart-detail">Mở chi tiết</button>
           </div>
-          <SensorChart history={history} />
+          <SensorChart />
         </div>
       </div>
 

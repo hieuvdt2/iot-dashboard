@@ -54,18 +54,37 @@ export const firebaseService = {
     return onAuthStateChanged(auth, callback);
   },
 
+  async ensureUserProfile(user) {
+    if (!user?.uid) return;
+    const profileRef = ref(db, `users/${user.uid}`);
+    const snap = await get(profileRef);
+    if (!snap.exists()) {
+      await set(profileRef, {
+        email: user.email || '',
+        createdAt: Date.now(),
+      });
+    } else {
+      const existing = snap.val() || {};
+      if (!existing.email && user.email) {
+        await set(profileRef, { ...existing, email: user.email });
+      }
+    }
+    const roleRef = ref(db, `roles/${user.uid}`);
+    const roleSnap = await get(roleRef);
+    if (!roleSnap.val()) {
+      await set(roleRef, 'viewer');
+    }
+  },
+
   async signIn(email, password) {
-    return signInWithEmailAndPassword(auth, email, password);
+    const credential = await signInWithEmailAndPassword(auth, email, password);
+    await this.ensureUserProfile(credential.user);
+    return credential;
   },
 
   async signUp(email, password) {
     const credential = await createUserWithEmailAndPassword(auth, email, password);
-    const user = credential.user;
-    await set(ref(db, `users/${user.uid}`), {
-      email: user.email,
-      createdAt: Date.now(),
-    });
-    await set(ref(db, `roles/${user.uid}`), 'viewer');
+    await this.ensureUserProfile(credential.user);
     return credential;
   },
 
@@ -131,18 +150,30 @@ export const firebaseService = {
 
   async getSensorHistory(limit = 30) {
     try {
-      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
       const q = query(
         ref(db, withDevicePath(`history/${today}`)),
-        orderByChild('timestamp'),
+        orderByChild('ts'),
         limitToLast(limit),
       );
       const snapshot = await get(q);
       const val = snapshot.val();
       if (!val) return [];
-      return Object.values(val).reverse();
+      return Object.values(val)
+        .sort((a, b) => (b.ts || 0) - (a.ts || 0)); // newest first
     } catch {
       return [];
+    }
+  },
+
+  /** One-shot fetch of all entries for a given YYYY-MM-DD date (no limit) */
+  async getHistoryForDate(dateKey) {
+    try {
+      const snapshot = await get(ref(db, withDevicePath(`history/${dateKey}`)));
+      return snapshot.val() || null;
+    } catch (e) {
+      console.warn('[Firebase] getHistoryForDate', dateKey, e.message);
+      return null;
     }
   },
 

@@ -1,11 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 
-function LoginPage({ onSignIn, authError }) {
-  const [email, setEmail] = useState('');
+const LAST_EMAIL_KEY = 'iot_last_login_email';
+
+function LoginPage({ onSignIn, authError, authUser, authLoading }) {
+  const [email, setEmail] = useState(() => {
+    try {
+      return localStorage.getItem(LAST_EMAIL_KEY) || '';
+    } catch {
+      return '';
+    }
+  });
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!authLoading && authUser) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [authUser, authLoading, navigate]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -13,7 +27,12 @@ function LoginPage({ onSignIn, authError }) {
     setSubmitting(true);
     try {
       await onSignIn(email, password);
-      navigate('/');
+      try {
+        localStorage.setItem(LAST_EMAIL_KEY, email.trim());
+      } catch {
+        // ignore
+      }
+      navigate('/dashboard', { replace: true });
     } finally {
       setSubmitting(false);
     }

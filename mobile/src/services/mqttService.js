@@ -1,4 +1,5 @@
 import mqtt from 'mqtt';
+import { normalizeSensorPayload } from '../utils/normalizeSensor';
 
 const MQTT_URL = 'wss://916cc55df8ed4fa2bfff8e4d25fd0f56.s1.eu.hivemq.cloud:8884/mqtt';
 const MQTT_OPTIONS = {
@@ -49,13 +50,7 @@ export default class MqttService {
         if (topic !== SENSOR_TOPIC) return;
         try {
           const raw = JSON.parse(message.toString());
-          const data = {
-            temperature: raw.temperature ?? raw.temp ?? null,
-            soilHum:     raw.soilMoisture ?? raw.soil_moisture ?? raw.soilHum ?? null,
-            airHum:      raw.airHumidity  ?? raw.air_humidity  ?? raw.airHum  ?? null,
-            waterLevel:  raw.waterLevel   ?? raw.water_level   ?? null,
-            light:       raw.light        ?? raw.lux           ?? raw.anh_sang ?? null,
-          };
+          const data = normalizeSensorPayload(raw);
           this._emit('sensorData', data);
           if (raw.pumpStatus !== undefined) {
             this._emit('pumpStatus', raw.pumpStatus);

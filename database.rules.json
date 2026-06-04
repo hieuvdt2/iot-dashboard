@@ -1,0 +1,36 @@
+{
+  "rules": {
+    "devices": {
+      "$deviceId": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'admin'",
+        "latest": {
+          ".write": "auth != null"
+        },
+        "history": {
+          ".write": "auth != null"
+        },
+        "config": {
+          ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'admin'"
+        },
+        "presets": {
+          ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'admin'"
+        }
+      }
+    },
+    "roles": {
+      ".read": "auth != null",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('roles').child(auth.uid).val() === 'admin')",
+        ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || (auth.uid === $uid && !data.exists() && newData.isString() && newData.val() === 'viewer'))"
+      }
+    },
+    "users": {
+      ".read": "auth != null && root.child('roles').child(auth.uid).val() === 'admin'",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('roles').child(auth.uid).val() === 'admin')",
+        ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || (auth.uid === $uid && !data.exists()))"
+      }
+    }
+  }
+}
