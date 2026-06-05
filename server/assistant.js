@@ -129,16 +129,32 @@ const toGeminiContents = (systemPrompt, messages) => {
   };
 };
 
-const callGemini = async (systemPrompt, messages) => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isRetryableGeminiError = (status, message = '') => {
+  const m = message.toLowerCase();
+  if (status === 503 || status === 429) return true;
+  return (
+    m.includes('high demand')
+    || m.includes('resource exhausted')
+    || m.includes('quota exceeded')
+    || m.includes('overloaded')
+  );
+};
+
+const geminiModelCandidates = () => {
+  const primary = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
+  return [...new Set([primary, 'gemini-2.5-flash-lite', 'gemini-2.5-flash'])];
+};
+
+const callGeminiOnce = async (apiKey, model, systemPrompt, messages) => {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const body = {
     ...toGeminiContents(systemPrompt, messages),
     generationConfig: {
       temperature: 0.65,
-      maxOutputTokens: 1200,
+      maxOutputTokens: 800,
     },
   };
 
@@ -163,6 +179,29 @@ const callGemini = async (systemPrompt, messages) => {
 
   if (!text) throw new Error('Gemini không trả về nội dung');
   return text;
+};
+
+const callGemini = async (systemPrompt, messages) => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  let lastErr;
+
+  for (const model of geminiModelCandidates()) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await callGeminiOnce(apiKey, model, systemPrompt, messages);
+      } catch (err) {
+        lastErr = err;
+        if (!isRetryableGeminiError(err.status, err.message)) throw err;
+        if (attempt < 2) await sleep(1500 * (attempt + 1));
+      }
+    }
+  }
+
+  const err = new Error(
+    'Gemini đang quá tải hoặc hết quota free tier. Đợi 30–60 giây rồi thử lại.'
+  );
+  err.status = lastErr?.status || 503;
+  throw err;
 };
 
 const callOpenAI = async (systemPrompt, messages) => {
@@ -215,7 +254,7 @@ const handleAssistantChat = async ({ messages, context }) => {
   }
 
   const safeMessages = Array.isArray(messages)
-    ? messages.slice(-12).filter((m) => m?.content && (m.role === 'user' || m.role === 'assistant'))
+    ? messages.slice(-8).filter((m) => m?.content && (m.role === 'user' || m.role === 'assistant'))
     : [];
 
   const systemPrompt = buildSystemPrompt(context);
