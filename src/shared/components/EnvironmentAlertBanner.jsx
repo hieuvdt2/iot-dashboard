@@ -1,4 +1,5 @@
 import React from 'react';
+import AppIcon from './AppIcon';
 
 function EnvironmentAlertBanner({ alerts }) {
   if (!alerts.length) return null;
@@ -11,7 +12,9 @@ function EnvironmentAlertBanner({ alerts }) {
 
       <div className="alert-banner-head">
         <div className="alert-banner-icon-wrap">
-          <span className="alert-banner-icon">⚠️</span>
+          <span className="alert-banner-icon">
+            <AppIcon name="alert-triangle" size={20} />
+          </span>
           <span className="alert-banner-pulse" aria-hidden="true" />
         </div>
         <div>
@@ -34,13 +37,16 @@ function EnvironmentAlertBanner({ alerts }) {
             className={`alert-item ${alert.severity}`}
             style={{ animationDelay: `${index * 0.08}s` }}
           >
-            <span className="alert-item-icon">{alert.icon}</span>
+            <span className="alert-item-icon">
+              <AppIcon name={alert.icon} size={16} />
+            </span>
             <span className="alert-item-label">{alert.title}</span>
             <span className="alert-item-value">{alert.short}</span>
 
             <div className="alert-item-tooltip" role="tooltip">
               <div className="alert-tooltip-title">
-                {alert.icon} {alert.title}
+                <AppIcon name={alert.icon} size={16} />
+                <span>{alert.title}</span>
               </div>
               <p className="alert-tooltip-detail">{alert.detail}</p>
               {alert.metric && (

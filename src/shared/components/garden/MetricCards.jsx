@@ -1,27 +1,12 @@
 import React from 'react';
 import { getHourTrend } from '../../hooks/useGardenChartData';
+import AppIcon from '../AppIcon';
 
-const ICONS = {
-  temp: (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" />
-    </svg>
-  ),
-  soil: (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
-    </svg>
-  ),
-  air: (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
-    </svg>
-  ),
-  water: (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M2 12c2-4 6-8 10-8s8 4 10 8-6 8-10 8-8-4-10-8z" />
-    </svg>
-  ),
+const ICON_NAMES = {
+  temp: 'thermometer',
+  soil: 'sprout',
+  air: 'wind',
+  water: 'droplets',
 };
 
 function trendClass(trend) {
@@ -99,7 +84,7 @@ export default function MetricCards({
       key: 'temp',
       label: 'Nhiệt độ',
       value: temp != null ? `${temp}°C` : '—',
-      icon: ICONS.temp,
+      icon: ICON_NAMES.temp,
       trend: getHourTrend(hourlyRaw, 'nhiet_do', temp),
       trendUnit: '°C',
       status: tempStatus(temp, maxTemp),
@@ -109,7 +94,7 @@ export default function MetricCards({
       key: 'soil',
       label: 'Độ ẩm đất',
       value: soil != null ? `${soil}%` : '—',
-      icon: ICONS.soil,
+      icon: ICON_NAMES.soil,
       trend: getHourTrend(hourlyRaw, 'do_am_dat', soil),
       trendUnit: '%',
       status: soilStatus(soil, minSoil, targetSoil),
@@ -119,7 +104,7 @@ export default function MetricCards({
       key: 'air',
       label: 'Độ ẩm không khí',
       value: air != null ? `${air}%` : '—',
-      icon: ICONS.air,
+      icon: ICON_NAMES.air,
       trend: getHourTrend(hourlyRaw, 'do_am_khong_khi', air),
       trendUnit: '%',
       status: airStatus(air, minAirHum),
@@ -128,7 +113,7 @@ export default function MetricCards({
       key: 'water',
       label: 'Mực nước',
       value: water != null ? `${water} cm` : '—',
-      icon: ICONS.water,
+      icon: ICON_NAMES.water,
       trend: getHourTrend(hourlyRaw, 'muc_nuoc', water),
       trendUnit: ' cm',
       status: waterStatus(water, maxWaterDistance),
@@ -146,7 +131,7 @@ export default function MetricCards({
               className="gd-metric-icon"
               style={{ background: ICON_BG[c.key], color: ICON_COLOR[c.key] }}
             >
-              {c.icon}
+              <AppIcon name={c.icon} size={20} color={ICON_COLOR[c.key]} />
             </span>
           </div>
           <div
