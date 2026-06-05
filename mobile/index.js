@@ -1,4 +1,5 @@
 // Entry point tùy chỉnh — polyfill chạy trước mọi thứ
+import 'react-native-gesture-handler';
 import { Buffer } from 'buffer';
 import process from 'process';
 

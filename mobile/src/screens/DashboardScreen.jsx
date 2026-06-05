@@ -6,17 +6,16 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { C } from '../theme';
+import { useMqtt } from '../MqttContext';
+import { firebaseService } from '../services/firebaseService';
+import HistoryDetailSheet from '../components/HistoryDetailSheet';
+import WeatherDayChart from '../components/WeatherDayChart';
 
 /* ── Icon helper ─────────────────────────────────────────────────────────── */
 function Icon({ lib = 'ion', name, size = 18, color = '#4a7a5a' }) {
   if (lib === 'mci') return <MaterialCommunityIcons name={name} size={size} color={color} />;
   return <Ionicons name={name} size={size} color={color} />;
 }
-import { useMqtt } from '../MqttContext';
-import { firebaseService } from '../services/firebaseService';
-import HistoryDetailSheet from '../components/HistoryDetailSheet';
-import WeatherDayChart from '../components/WeatherDayChart';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -155,7 +154,7 @@ function HeroCard({ sensorData, pumpState, autoMode, maxWaterDist }) {
 
   return (
     <ImageBackground
-      source={require('../../assets/garden-bg.png')}
+      source={require('../../assets/garden-bg.jpg')}
       style={hero.imgBg}
       imageStyle={{ borderBottomLeftRadius: 28, borderBottomRightRadius: 28 }}
       resizeMode="cover"
