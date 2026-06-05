@@ -125,6 +125,7 @@ function App() {
   const [latestLoaded, setLatestLoaded] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [presetsLoaded, setPresetsLoaded] = useState(false);
+  const [bootstrapped, setBootstrapped] = useState(false);
   const [historyDate] = useState(() =>
     new Date().toISOString().slice(0, 10)
   );
@@ -337,6 +338,15 @@ function App() {
     return () => clearTimeout(timer);
   }, [toast]);
 
+  useEffect(() => {
+    if (bootstrapped) return;
+    const firebaseReady = latestLoaded && historyLoaded && presetsLoaded;
+    const mqttReady = connected || ['offline', 'disconnected', 'connected'].includes(mqttStatus);
+    if (firebaseReady && mqttReady) {
+      setBootstrapped(true);
+    }
+  }, [bootstrapped, connected, mqttStatus, latestLoaded, historyLoaded, presetsLoaded]);
+
   const hasUnsavedDraft = useMemo(
     () => !thresholdsEqual(draftThresholds, deployedThresholds),
     [draftThresholds, deployedThresholds]
@@ -521,12 +531,13 @@ function App() {
   };
   const currentStatus = statusLabel[mqttStatus] || statusLabel.connecting;
 
-  const isMqttConnecting = mqttStatus === 'connecting' || mqttStatus === 'reconnecting';
-  const isFirebaseLoading = !historyLoaded || !presetsLoaded || !latestLoaded;
-  const showLoading = isMqttConnecting || isFirebaseLoading;
+  const showLoading = !bootstrapped;
   const loadingMessages = [];
-  if (isMqttConnecting) loadingMessages.push('Dang ket noi MQTT...');
-  if (isFirebaseLoading) loadingMessages.push('Dang tai du lieu Firebase...');
+  if (mqttStatus === 'connecting' && !connected) loadingMessages.push('Dang ket noi MQTT...');
+  if (!latestLoaded || !historyLoaded || !presetsLoaded) {
+    loadingMessages.push('Dang tai du lieu Firebase...');
+  }
+  if (mqttStatus === 'reconnecting') loadingMessages.push('Dang ket noi lai MQTT...');
 
   const hasConfig = Boolean(
     sensorData?.has_config ?? sensorData?.config ?? configReady
