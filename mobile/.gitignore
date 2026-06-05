@@ -1,0 +1,8 @@
+# Native folders — EAS Build tự generate, không commit
+android/
+ios/
+
+# Expo / Metro
+.expo/
+dist/
+node_modules/

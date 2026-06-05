@@ -18,6 +18,7 @@ config.resolver.alias = {
   buffer: require.resolve('buffer'),
   process: require.resolve('process/browser'),
   events: require.resolve('events'),
+  'react-native-linear-gradient': require.resolve('./shims/react-native-linear-gradient'),
 };
 
 // Hỗ trợ .cjs

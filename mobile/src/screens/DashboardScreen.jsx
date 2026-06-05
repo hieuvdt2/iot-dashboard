@@ -155,7 +155,7 @@ function HeroCard({ sensorData, pumpState, autoMode, maxWaterDist }) {
 
   return (
     <ImageBackground
-      source={require('../../assets/garden-bg.png')}
+      source={require('../../assets/garden-bg.jpg')}
       style={hero.imgBg}
       imageStyle={{ borderBottomLeftRadius: 28, borderBottomRightRadius: 28 }}
       resizeMode="cover"
