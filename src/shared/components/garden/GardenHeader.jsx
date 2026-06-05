@@ -1,10 +1,11 @@
 import React from 'react';
+import AppIcon from '../AppIcon';
 
 const STATUS_MAP = {
-  TOT: { icon: '🌱', label: 'Vườn ổn định', tone: 'success' },
-  CAN_CHU_Y: { icon: '⚠️', label: 'Cần chú ý', tone: 'warning' },
-  NGUY_HIEM: { icon: '🚨', label: 'Cần tưới ngay', tone: 'danger' },
-  CHUA_CAU_HINH: { icon: '⚙️', label: 'Chưa cấu hình', tone: 'muted' },
+  TOT: { icon: 'sprout', label: 'Vườn ổn định', tone: 'success' },
+  CAN_CHU_Y: { icon: 'alert-triangle', label: 'Cần chú ý', tone: 'warning' },
+  NGUY_HIEM: { icon: 'siren', label: 'Cần tưới ngay', tone: 'danger' },
+  CHUA_CAU_HINH: { icon: 'settings', label: 'Chưa cấu hình', tone: 'muted' },
 };
 
 function formatLastUpdate(sensorData, chartSync) {
@@ -24,7 +25,7 @@ export default function GardenHeader({
   chartLastSync,
 }) {
   const mapped = STATUS_MAP[gardenStatus] ?? {
-    icon: '🌿',
+    icon: 'leaf',
     label: gardenStatusLabel || 'Đang cập nhật',
     tone: 'muted',
   };
@@ -38,13 +39,15 @@ export default function GardenHeader({
         <div>
           <div className="gd-header-title">Trạng thái vườn</div>
           <div className="gd-status-row">
-            <span className="gd-status-icon" aria-hidden>{mapped.icon}</span>
+            <span className="gd-status-icon" aria-hidden>
+              <AppIcon name={mapped.icon} size={22} />
+            </span>
             <span className={`gd-status-label ${mapped.tone}`}>{mapped.label}</span>
           </div>
         </div>
         <div className="gd-meta-chips">
           <span className={`gd-chip ${connected ? 'online' : 'offline'}`}>
-            {connected ? '● ESP32 đang kết nối' : '○ ESP32 mất kết nối'}
+            {connected ? 'ESP32 đang kết nối' : 'ESP32 mất kết nối'}
           </span>
           <span className={`gd-chip ${autoOn ? 'auto-on' : ''}`}>
             {autoLabel}

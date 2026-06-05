@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import ReactECharts from 'echarts-for-react';
+import AppIcon from './AppIcon';
 import {
   normalizeEntry,
   aggregateHourly,
@@ -11,11 +12,11 @@ import { firebaseService } from '../services/firebaseService';
 /* ── Config ─────────────────────────────────────────────────────────────── */
 
 const SENSORS = [
-  { key: 'nhiet_do',        label: 'Nhiệt độ',        unit: '°C',  icon: '🌡️', color: '#ef4444', areaColor: ['#ef444440', '#ef444400'] },
-  { key: 'do_am_dat',       label: 'Độ ẩm đất',       unit: '%',   icon: '🌱', color: '#22c55e', areaColor: ['#22c55e40', '#22c55e00'] },
-  { key: 'do_am_khong_khi', label: 'Độ ẩm không khí', unit: '%',   icon: '💧', color: '#3b82f6', areaColor: ['#3b82f640', '#3b82f600'] },
-  { key: 'anh_sang',        label: 'Ánh sáng',         unit: 'lux', icon: '☀️', color: '#f59e0b', areaColor: ['#f59e0b40', '#f59e0b00'] },
-  { key: 'muc_nuoc',        label: 'Mực nước',         unit: 'cm',  icon: '🪣', color: '#a855f7', areaColor: ['#a855f740', '#a855f700'] },
+  { key: 'nhiet_do',        label: 'Nhiệt độ',        unit: '°C',  icon: 'thermometer', color: '#ef4444', areaColor: ['#ef444440', '#ef444400'] },
+  { key: 'do_am_dat',       label: 'Độ ẩm đất',       unit: '%',   icon: 'sprout',      color: '#22c55e', areaColor: ['#22c55e40', '#22c55e00'] },
+  { key: 'do_am_khong_khi', label: 'Độ ẩm không khí', unit: '%',   icon: 'droplets',    color: '#3b82f6', areaColor: ['#3b82f640', '#3b82f600'] },
+  { key: 'anh_sang',        label: 'Ánh sáng',         unit: 'lux', icon: 'sun',         color: '#f59e0b', areaColor: ['#f59e0b40', '#f59e0b00'] },
+  { key: 'muc_nuoc',        label: 'Mực nước',         unit: 'cm',  icon: 'container',   color: '#a855f7', areaColor: ['#a855f740', '#a855f700'] },
 ];
 
 const RANGES = [
@@ -213,7 +214,8 @@ export default function SensorChart() {
               cursor: 'pointer', transition: 'all 0.15s',
             }}
           >
-            {s.icon} {s.label}
+            <AppIcon name={s.icon} size={14} color={sensorKey === s.key ? s.color : '#9ca3af'} />
+            {s.label}
             {sensorKey === s.key && (
               <span style={{
                 background: s.color, color: '#fff', borderRadius: 999,
@@ -228,7 +230,10 @@ export default function SensorChart() {
 
       {/* ── Desc ── */}
       <p style={{ fontSize: '0.7rem', color: '#9ca3af', marginBottom: 8, marginTop: -6 }}>
-        📊 {activeRange.desc}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          <AppIcon name="bar-chart" size={13} />
+          {activeRange.desc}
+        </span>
         {lastSync && (
           <span style={{ marginLeft: 8, color: '#d1d5db' }}>
             · {lastSync.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
@@ -244,7 +249,7 @@ export default function SensorChart() {
         </div>
       ) : !hasData ? (
         <div className="chart-empty">
-          <p style={{ fontSize: '2rem' }}>📭</p>
+          <AppIcon name="inbox" size={36} color="#d1d5db" />
           <p>Chưa có dữ liệu cho khoảng thời gian này.</p>
           <p style={{ fontSize: '0.76rem', color: '#d1d5db' }}>Thử chọn khoảng khác hoặc bấm Làm mới.</p>
         </div>

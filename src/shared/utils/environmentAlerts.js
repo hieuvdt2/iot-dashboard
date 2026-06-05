@@ -11,7 +11,7 @@ const buildSoilAlert = (soil, minSoil) => {
 
   return {
     id: 'soil-dry',
-    icon: '🌱',
+    icon: 'sprout',
     title: 'Đất đang khô',
     short: `Độ ẩm đất ${soil}%`,
     severity,
@@ -30,7 +30,7 @@ const buildTempAlert = (temp, maxTemp) => {
 
   return {
     id: 'temp-high',
-    icon: '🌡️',
+    icon: 'thermometer',
     title: 'Nhiệt độ cao',
     short: `${temp}°C`,
     severity,
@@ -49,7 +49,7 @@ const buildAirAlert = (airHum, minAirHum) => {
 
   return {
     id: 'air-dry',
-    icon: '💨',
+    icon: 'wind',
     title: 'Không khí khô',
     short: `KK ${airHum}%`,
     severity,
@@ -65,7 +65,7 @@ const buildLightAlert = (light, maxLux) => {
 
   return {
     id: 'light-high',
-    icon: '☀️',
+    icon: 'sun',
     title: 'Ánh sáng quá mạnh',
     short: `${light >= 1000 ? `${(light / 1000).toFixed(1)}k` : light} lux`,
     severity: light > maxLux * 1.2 ? 'danger' : 'warning',
@@ -89,7 +89,7 @@ const buildWaterAlert = (water, maxWaterDistance) => {
 
   return {
     id: 'water-low',
-    icon: '💧',
+    icon: 'droplets',
     title: 'Mực nước thấp',
     short: `${water} cm`,
     severity,

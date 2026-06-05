@@ -5,6 +5,7 @@ import './App.css';
 import DashboardPage from './shared/components/DashboardPage';
 import ConfigPage from './shared/components/ConfigPage';
 import ControlButtons from './shared/components/ControlButtons';
+import SettingsStatusPanel from './shared/components/control/SettingsStatusPanel';
 import GardenAssistant from './shared/components/GardenAssistant';
 import EnvironmentToast from './shared/components/EnvironmentToast';
 import LoginPage from './pages/LoginPage';
@@ -117,6 +118,40 @@ const maskEnvValue = (value) => {
   return `${value.slice(0, 3)}***${value.slice(-2)}`;
 };
 
+const loadBoolPref = (key, fallback = false) => {
+  try {
+    return localStorage.getItem(key) === 'true';
+  } catch {
+    return fallback;
+  }
+};
+
+const loadThemePref = () => {
+  try {
+    const saved = localStorage.getItem('iot_theme');
+    return saved === 'dark' ? 'dark' : 'light';
+  } catch {
+    return 'light';
+  }
+};
+
+const MOBILE_MEDIA = '(max-width: 768px)';
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(MOBILE_MEDIA).matches,
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE_MEDIA);
+    const onChange = (event) => setIsMobile(event.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  return isMobile;
+}
+
 function App() {
   const [sensorData, setSensorData] = useState(null);
   const [history, setHistory] = useState([]);
@@ -138,6 +173,10 @@ function App() {
   const [role, setRole] = useState('viewer');
   const [authError, setAuthError] = useState('');
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => loadBoolPref('iot_sidebar_collapsed'));
+  const isMobile = useIsMobile();
+  const navCollapsed = sidebarCollapsed && !isMobile;
+  const [theme, setTheme] = useState(loadThemePref);
   const userMenuRef = useRef(null);
   const [users, setUsers] = useState({});
   const [roles, setRoles] = useState({});
@@ -339,6 +378,32 @@ function App() {
   }, [toast]);
 
   useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    try {
+      localStorage.setItem('iot_theme', theme);
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [theme]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('iot_sidebar_collapsed', String(sidebarCollapsed));
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [sidebarCollapsed]);
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((prev) => !prev);
+    setUserMenuOpen(false);
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
+  }, []);
+
+  useEffect(() => {
     if (bootstrapped) return;
     const firebaseReady = latestLoaded && historyLoaded && presetsLoaded;
     const mqttReady = connected || ['offline', 'disconnected', 'connected'].includes(mqttStatus);
@@ -523,11 +588,11 @@ function App() {
   };
 
   const statusLabel = {
-    connected: { text: '🟢 Đã kết nối', cls: 'online' },
-    reconnecting: { text: '🟡 Đang kết nối lại...', cls: 'reconnecting' },
-    disconnected: { text: '🔴 Mất kết nối', cls: 'offline' },
-    offline: { text: '🔴 Ngoại tuyến', cls: 'offline' },
-    connecting: { text: '🟡 Đang kết nối...', cls: 'reconnecting' },
+    connected: { text: 'Đã kết nối', cls: 'online' },
+    reconnecting: { text: 'Đang kết nối lại...', cls: 'reconnecting' },
+    disconnected: { text: 'Mất kết nối', cls: 'offline' },
+    offline: { text: 'Ngoại tuyến', cls: 'offline' },
+    connecting: { text: 'Đang kết nối...', cls: 'reconnecting' },
   };
   const currentStatus = statusLabel[mqttStatus] || statusLabel.connecting;
 
@@ -611,8 +676,6 @@ function App() {
     TAT: 'Thủ công',
   };
   const autoModeLabel = autoModeLabelMap[autoMode] || autoMode || '---';
-  const modeTone = autoMode === 'BAT' ? 'on' : autoMode === 'TAT' ? 'off' : 'muted';
-  const pumpTone = pumpStatus === 'DANG_TUOI' ? 'on' : pumpStatus === 'KHONG_TUOI' ? 'off' : 'muted';
   const pumpOn = pumpStatus === 'DANG_TUOI';
   const waterDistance = sensorData?.muc_nuoc ?? null;
   const waterPct = waterDistance !== null
@@ -623,7 +686,8 @@ function App() {
     : waterDistance <= maxWaterDistance * 0.5 ? 'full'   // Đủ nước
     : waterDistance <= maxWaterDistance       ? 'low'    // Thấp
     : 'empty';                                           // Cạn — khoá bơm
-  const waterStatusLabel = { full: '✓ Đủ nước', low: '⚠ Nước thấp', empty: '✗ Cạn', null: '--' }[waterStatus];
+  const waterStatusLabel = { full: 'Đủ nước', low: 'Nước thấp', empty: 'Cạn', null: '--' }[waterStatus];
+  const waterStatusIcon = { full: 'check-circle', low: 'alert-triangle', empty: 'x-circle', null: null }[waterStatus];
   const waterStatusColor = { full: '#16a34a', low: '#d97706', empty: '#dc2626', null: '#9ca3af' }[waterStatus];
 
   const needsWatering = Boolean(
@@ -694,9 +758,9 @@ function App() {
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       ) : (
-      <div className="app">
+      <div className={`app${navCollapsed ? ' sidebar-collapsed' : ''}`}>
         {/* ===== SIDEBAR ===== */}
-        <aside className="sidebar">
+        <aside className="sidebar" aria-hidden={navCollapsed}>
           <div className="sidebar-logo">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2a10 10 0 0 1 0 20"/>
@@ -712,11 +776,13 @@ function App() {
                 <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
                 <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
               </svg>
+              <span className="sidebar-label">Tổng quan</span>
             </Link>
             <Link className={`sidebar-icon ${activeTab === 'config' ? 'active' : ''}`} to="/dashboard" title="Cấu hình" onClick={() => setActiveTab('config')}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
               </svg>
+              <span className="sidebar-label">Cấu hình</span>
             </Link>
             <div className="sidebar-divider"/>
             {canEdit && (
@@ -727,6 +793,7 @@ function App() {
                   <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
                   <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
                 </svg>
+                <span className="sidebar-label">Quản trị</span>
               </Link>
             )}
             <div className="sidebar-divider"/>
@@ -740,6 +807,7 @@ function App() {
                 <circle cx="12" cy="12" r="3"/>
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
               </svg>
+              <span className="sidebar-label">Điều khiển</span>
             </Link>
           </nav>
 
@@ -799,6 +867,7 @@ function App() {
                   <polyline points="10 17 15 12 10 7"/>
                   <line x1="15" y1="12" x2="3" y2="12"/>
                 </svg>
+                <span className="sidebar-label">Đăng nhập</span>
               </Link>
             )}
           </div>
@@ -822,6 +891,53 @@ function App() {
               <p>Đây là cập nhật mới nhất từ vườn thông minh của bạn</p>
             </div>
             <div className="header-actions">
+              <button
+                type="button"
+                className="btn-icon sidebar-toggle-btn"
+                onClick={toggleSidebar}
+                aria-label={navCollapsed ? 'Mở thanh điều hướng' : 'Ẩn thanh điều hướng'}
+                title={navCollapsed ? 'Mở menu' : 'Ẩn menu'}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  {navCollapsed ? (
+                    <>
+                      <line x1="3" y1="6" x2="21" y2="6" />
+                      <line x1="3" y1="12" x2="21" y2="12" />
+                      <line x1="3" y1="18" x2="21" y2="18" />
+                    </>
+                  ) : (
+                    <>
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <line x1="9" y1="3" x2="9" y2="21" />
+                    </>
+                  )}
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="btn-icon"
+                onClick={toggleTheme}
+                aria-label={theme === 'dark' ? 'Chế độ sáng' : 'Chế độ tối'}
+                title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  {theme === 'dark' ? (
+                    <>
+                      <circle cx="12" cy="12" r="5" />
+                      <line x1="12" y1="1" x2="12" y2="3" />
+                      <line x1="12" y1="21" x2="12" y2="23" />
+                      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                      <line x1="1" y1="12" x2="3" y2="12" />
+                      <line x1="21" y1="12" x2="23" y2="12" />
+                      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                    </>
+                  ) : (
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                  )}
+                </svg>
+              </button>
               <div className={`connection-badge ${currentStatus.cls}`}>
                 {connected ? 'Đã kết nối' : mqttStatus === 'reconnecting' ? 'Đang kết nối...' : 'Mất kết nối'}
               </div>
@@ -873,7 +989,6 @@ function App() {
                       onSetRole={handleSetRole}
                       authUser={authUser}
                       adminDbError={adminDbError}
-                      currentRole={role}
                     />
                   ) : (
                     <Navigate to="/dang-nhap" replace />
@@ -953,61 +1068,17 @@ function App() {
                         canControl={canControl}
                       />
 
-                      <div className="settings-info">
-                        <div className={`settings-visual-card water-flow-card ${pumpOn ? 'flowing' : 'idle'}`}>
-                          <div className="visual-header">
-                            <span className="visual-title">Dòng chảy bơm</span>
-                            <span className={`mode-pill ${pumpTone}`}>{pumpStatusLabel || '---'}</span>
-                          </div>
-                          <div className="water-scene">
-                            <div className="tank">
-                              <div className="tank-water" style={{ height: `${waterPct}%` }} />
-                              <div className="tank-level">
-                                {waterDistance !== null ? `${waterPct}%` : '--'}
-                              </div>
-                              <div className="tank-sub">
-                                {waterDistance !== null ? `${waterDistance} cm` : '--'}
-                              </div>
-                            </div>
-                            {waterStatus && (
-                              <div style={{
-                                position: 'absolute', top: -28, left: 0, right: 0,
-                                textAlign: 'center',
-                                fontSize: '0.75rem', fontWeight: 700,
-                                color: waterStatusColor,
-                              }}>
-                                {waterStatusLabel}
-                              </div>
-                            )}
-                            <div className="pipe">
-                              <div className="pipe-line" />
-                              <div className="pipe-flow" />
-                            </div>
-                            <div className="pump-unit">
-                              <div className="pump-core" />
-                              <div className="pump-label">PUMP</div>
-                            </div>
-                            <div className="water-drops">
-                              <span className="drop d1" />
-                              <span className="drop d2" />
-                              <span className="drop d3" />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className={`settings-visual-card auto-mode-card ${autoMode === 'BAT' ? 'auto-on' : 'auto-off'}`}>
-                          <div className="visual-header">
-                            <span className="visual-title">Chế độ tưới</span>
-                            <span className={`mode-pill ${modeTone}`}>{autoModeLabel}</span>
-                          </div>
-                          <div className="robot-figure">
-                            <img
-                              src={`${process.env.PUBLIC_URL}/robot-garden.png`}
-                              alt="Robot AI tưới cây"
-                            />
-                          </div>
-                        </div>
-                      </div>
+                      <SettingsStatusPanel
+                        waterPct={waterPct}
+                        waterDistance={waterDistance}
+                        waterStatusLabel={waterStatusLabel}
+                        waterStatusIcon={waterStatusIcon}
+                        waterStatusColor={waterStatusColor}
+                        pumpOn={pumpOn}
+                        pumpStatusLabel={pumpStatusLabel}
+                        isAuto={autoMode === 'BAT'}
+                        autoModeLabel={autoModeLabel}
+                      />
                     </div>
                   ) : (
                     <Navigate to="/dang-nhap" replace />
@@ -1019,13 +1090,21 @@ function App() {
           </main>
         </div>
 
-        {configReady && alerts.length > 0 && authUser && (
+        {configReady && alerts.length > 0 && authUser && activeTab !== 'dashboard' && (
           <EnvironmentToast alerts={alerts} />
         )}
 
         {toast && (
-          <div className={`toast ${toast.type} ${alerts.length > 0 ? 'toast-stacked' : ''}`}>
-            {toast.message}
+          <div className={`toast ${toast.type} ${configReady && alerts.length > 0 && authUser && activeTab !== 'dashboard' ? 'toast-stacked' : ''}`}>
+            <span className="toast-message">{toast.message}</span>
+            <button
+              type="button"
+              className="toast-close"
+              onClick={() => setToast(null)}
+              aria-label="Đóng thông báo"
+            >
+              ×
+            </button>
           </div>
         )}
 

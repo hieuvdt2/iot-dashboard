@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import AppIcon, { IconHeading } from './AppIcon';
 
 // maxWaterDistance là cài đặt phần cứng, không phải thuộc tính cây trồng
 // nên không đưa vào preset. Xem mục "Cài đặt bể nước" riêng bên dưới.
@@ -372,7 +373,7 @@ function ConfigPage({
             <div className="config-card config-card-large">
               <div className="config-header">
                 <div>
-                  <h3>🌿 Cấu hình AUTO</h3>
+                  <IconHeading icon="leaf">Cấu hình AUTO</IconHeading>
                   <div className="config-status-row">
                     <span className={`config-status ${configReady ? 'ready' : 'empty'}`}>
                       {configReady ? 'Thiết bị đã nhận cài đặt' : 'Thiết bị chưa có cài đặt'}
@@ -420,7 +421,8 @@ function ConfigPage({
 
               {!canEdit && (
                 <div className="config-warning">
-                  ⚠️ Tài khoản hiện tại chỉ có quyền xem.
+                  <AppIcon name="alert-triangle" size={16} />
+                  <span>Tài khoản hiện tại chỉ có quyền xem.</span>
                 </div>
               )}
 
@@ -450,7 +452,7 @@ function ConfigPage({
           <div className="preset-layout preset-layout-centered">
             <div className="preset-card preset-card-large">
               <div className="preset-header">
-                <h3>🌱 Mẫu cây trồng</h3>
+                <IconHeading icon="sprout">Mẫu cây trồng</IconHeading>
                 <p>Chọn mẫu để xem trước — thiết bị chỉ cập nhật khi bấm &quot;Áp dụng lên thiết bị&quot;.</p>
               </div>
 
@@ -583,7 +585,7 @@ function ConfigPage({
 
             <div className="preview-card preview-card-large">
               <div className="preview-header">
-                <h3>🔎 Xem trước tình trạng vườn</h3>
+                <IconHeading icon="search">Xem trước tình trạng vườn</IconHeading>
                 <span>Dựa trên mẫu đang chọn (chưa áp dụng)</span>
               </div>
               {!selectedPreset && (
@@ -629,46 +631,41 @@ function ConfigPage({
       </section>
 
       {/* ─── Cài đặt bể nước (device-level, không phụ thuộc loại cây) ─── */}
-      <div className="config-single" style={{ maxWidth: 680, margin: '0 auto' }}>
-        <div className="config-card" style={{ marginTop: 0 }}>
-          <div className="config-header">
+      <div className="config-single water-tank-section">
+        <div className="config-card water-tank-card">
+          <div className="config-header water-tank-header">
             <div>
-              <h3>🪣 Cài đặt bể nước</h3>
-              <p className="config-status" style={{ marginTop: 4 }}>
+              <IconHeading icon="container">Cài đặt bể nước</IconHeading>
+              <p className="config-status">
                 Ngưỡng xác định bể còn nước hay không — không phụ thuộc loại cây trồng.
               </p>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-2)', fontWeight: 600 }}>
-                Khoảng cách cảnh báo cạn bể (cm)
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+
+          <div className="water-tank-body">
+            <label className="water-tank-field">
+              <span className="water-tank-label">Khoảng cách cảnh báo cạn bể</span>
+              <div className="water-tank-input-row">
                 <input
                   type="number"
+                  className="water-tank-input"
                   min="1"
                   max="200"
                   value={maxWaterDistance ?? 20}
                   onChange={(e) => onMaxWaterDistanceChange(Number(e.target.value))}
                   disabled={!canEdit}
-                  style={{
-                    width: 80, padding: '7px 10px', borderRadius: 7,
-                    border: '1px solid var(--border)', background: 'var(--bg)',
-                    color: 'var(--text)', fontSize: '0.9rem', fontFamily: 'inherit',
-                    outline: 'none',
-                  }}
                 />
-                <span style={{ fontSize: '0.82rem', color: 'var(--text-2)' }}>cm</span>
+                <span className="water-tank-unit">cm</span>
               </div>
-            </div>
-            <div style={{
-              flex: 1, padding: '10px 14px', borderRadius: 10,
-              background: 'var(--blue-light)', border: '1px solid #bfdbfe',
-              fontSize: '0.8rem', color: '#1e40af', lineHeight: 1.55,
-            }}>
-              <strong>Cảm biến đo khoảng cách từ đầu bể xuống mặt nước.</strong><br />
-              Nếu khoảng cách &gt; {maxWaterDistance ?? 20} cm → cảnh báo &quot;Nước thấp / Cạn&quot; và khoá bơm an toàn.
+            </label>
+
+            <div className="water-tank-note">
+              <p>
+                <strong>Cảm biến đo khoảng cách từ đầu bể xuống mặt nước.</strong>
+              </p>
+              <p>
+                Nếu khoảng cách &gt; {maxWaterDistance ?? 20} cm → cảnh báo &quot;Nước thấp / Cạn&quot; và khoá bơm an toàn.
+              </p>
             </div>
           </div>
         </div>
