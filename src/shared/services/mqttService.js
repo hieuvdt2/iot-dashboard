@@ -4,27 +4,31 @@ const MQTT_URL =
   process.env.REACT_APP_MQTT_URL ||
   'wss://916cc55df8ed4fa2bfff8e4d25fd0f56.s1.eu.hivemq.cloud:8884/mqtt';
 
-/** Mỗi tab trình duyệt cần clientId riêng — trùng ID sẽ đá nhau và gây reconnect liên tục */
+/**
+ * MQTT broker chỉ cho 1 kết nối / clientId.
+ * Nhiều máy/tab dùng chung ID → máy sau vào sẽ đá máy trước (reconnect loop).
+ * Luôn thêm hậu tố unique per tab; không dùng env làm ID nguyên khối.
+ */
 const getMqttClientId = () => {
-  const fromEnv = process.env.REACT_APP_MQTT_CLIENT_ID?.trim();
-  if (fromEnv) return fromEnv;
-
   const storageKey = 'iot_mqtt_client_id';
+  let unique;
   try {
-    const existing = sessionStorage.getItem(storageKey);
-    if (existing) return existing;
-    const id = `iot_web_${Math.random().toString(16).slice(2, 10)}_${Date.now().toString(36)}`;
-    sessionStorage.setItem(storageKey, id);
-    return id;
+    unique = sessionStorage.getItem(storageKey);
+    if (!unique) {
+      unique = `${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 10)}`;
+      sessionStorage.setItem(storageKey, unique);
+    }
   } catch {
-    return `iot_web_${Math.random().toString(16).slice(2, 10)}`;
+    unique = `${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 10)}`;
   }
+
+  const prefix = process.env.REACT_APP_MQTT_CLIENT_ID?.trim() || 'iot_web';
+  return `${prefix}_${unique}`;
 };
 
-const MQTT_OPTIONS = {
+const MQTT_BASE_OPTIONS = {
   username: process.env.REACT_APP_MQTT_USERNAME || 'location',
   password: process.env.REACT_APP_MQTT_PASSWORD || 'Abc12345',
-  clientId: getMqttClientId(),
   clean: true,
   reconnectPeriod: 3000,
   connectTimeout: 10000,
@@ -82,7 +86,9 @@ class MqttService {
     if (this.client || this.connecting) return;
     this.connecting = true;
 
-    this.client = mqtt.connect(MQTT_URL, MQTT_OPTIONS);
+    const clientId = getMqttClientId();
+    this.client = mqtt.connect(MQTT_URL, { ...MQTT_BASE_OPTIONS, clientId });
+    console.log('[MQTT] Ket noi voi clientId:', clientId);
 
     this.client.on('connect', () => {
       this.connected = true;
