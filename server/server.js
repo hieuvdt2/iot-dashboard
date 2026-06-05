@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const mqtt = require('mqtt');
 const express = require('express');
+const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
@@ -144,18 +145,31 @@ const writeConfigToFirebase = async (config) => {
 // ===== EXPRESS + SOCKET.IO =====
 const app = express();
 const server = http.createServer(app);
-const corsOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
-  : '*';
+function parseCorsOrigins() {
+  const raw = (process.env.CORS_ORIGIN || '').trim();
+  if (!raw || raw === '*') return true;
+  return raw.split(',').map((origin) => origin.trim()).filter(Boolean);
+}
+
+const corsOrigins = parseCorsOrigins();
+
+const corsOptions = {
+  origin: corsOrigins,
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  maxAge: 86400,
+};
 
 const io = new Server(server, {
   cors: {
-    origin: corsOrigins,
-    methods: ['GET', 'POST'],
+    origin: corsOrigins === true ? '*' : corsOrigins,
+    methods: ['GET', 'POST', 'OPTIONS'],
   },
 });
 
 const buildPath = path.join(__dirname, '../build');
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json());
 
 // ===== API (đăng ký trước static để không bị che) =====
@@ -365,5 +379,11 @@ server.listen(PORT, () => {
   console.log(`   Topics:  ${TOPICS.SENSOR} (sub), ${TOPICS.CONTROL} (pub)\n`);
   console.log(`   Firebase: ${firebaseReady ? 'ready' : 'not ready'}`);
   console.log(`   Device:   ${DEVICE_ID}`);
-  console.log(`   AI:       ${pickProvider() || 'disabled (set GEMINI_API_KEY or OPENAI_API_KEY)'}\n`);
+  const aiProvider = pickProvider();
+  if (aiProvider) {
+    console.log(`   AI:       ${aiProvider} (ready)`);
+  } else {
+    console.log('   AI:       DISABLED — thêm GEMINI_API_KEY vào server/.env rồi restart');
+  }
+  console.log(`   CORS:     ${process.env.CORS_ORIGIN?.trim() || 'all origins'}\n`);
 });

@@ -17,12 +17,14 @@ import DashboardScreen from "./src/screens/DashboardScreen";
 import ConfigScreen   from "./src/screens/ConfigScreen";
 import ControlScreen  from "./src/screens/ControlScreen";
 import AccountScreen  from "./src/screens/AccountScreen";
+import GardenAssistant from "./src/components/GardenAssistant";
 
 const Stack = createNativeStackNavigator();
 const Tab   = createBottomTabNavigator();
 
 function MainTabs() {
   return (
+    <View style={{ flex: 1 }}>
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
@@ -80,6 +82,8 @@ function MainTabs() {
         }}
       />
     </Tab.Navigator>
+    <GardenAssistant />
+    </View>
   );
 }
 

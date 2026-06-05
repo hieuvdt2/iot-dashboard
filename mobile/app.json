@@ -23,6 +23,7 @@
     "newArchEnabled": false,
     "plugins": [],
     "extra": {
+      "apiUrl": "https://server-iot-0qml.onrender.com",
       "eas": {
         "projectId": "12392a42-8d78-415c-a31e-76a55e9beff1"
       }

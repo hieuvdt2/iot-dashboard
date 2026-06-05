@@ -1,7 +1,7 @@
-const API_URL = process.env.REACT_APP_API_URL || '';
+const API_BASE = (process.env.REACT_APP_API_URL || '').replace(/\/$/, '');
 
 export async function sendAssistantMessage({ messages, context }) {
-  const url = `${API_URL.replace(/\/$/, '')}/api/assistant/chat`;
+  const url = `${API_BASE}/api/assistant/chat`;
 
   const response = await fetch(url, {
     method: 'POST',
