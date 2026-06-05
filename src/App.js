@@ -125,8 +125,7 @@ function App() {
   const [latestLoaded, setLatestLoaded] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [presetsLoaded, setPresetsLoaded] = useState(false);
-  const [historyFilter, setHistoryFilter] = useState(20);
-  const [historyDate, setHistoryDate] = useState(() =>
+  const [historyDate] = useState(() =>
     new Date().toISOString().slice(0, 10)
   );
   const [toast, setToast] = useState(null);
@@ -331,10 +330,6 @@ function App() {
       unsubscribeRoles();
     };
   }, [authUser, role]);
-
-  const clearHistory = () => {
-    setHistory([]);
-  };
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -599,9 +594,6 @@ function App() {
   };
   const gardenStatusLabel = gardenStatusLabelMap[gardenStatus] || gardenStatus;
   const pumpStatusLabel = pumpStatusLabelMap[pumpStatus] || pumpStatus;
-  const gardenStatusClass = typeof gardenStatus === 'string'
-    ? gardenStatus.toLowerCase()
-    : 'muted';
 
   const autoModeLabelMap = {
     BAT: 'Tự động',
@@ -835,7 +827,7 @@ function App() {
 
 
 
-          <main className="app-main">
+          <main className={`app-main${activeTab === 'dashboard' ? ' garden-dark' : ''}`}>
             <Routes>
               <Route
                 path="/dang-nhap"
@@ -896,19 +888,12 @@ function App() {
                         configReady={configReady}
                         sensorData={sensorData}
                         connected={connected}
+                        gardenStatus={gardenStatus}
                         gardenStatusLabel={gardenStatusLabel}
-                        gardenStatusClass={gardenStatusClass}
                         autoMode={autoMode}
                         pumpStatus={pumpStatus}
                         pumpStatusLabel={pumpStatusLabel}
-                        needsWatering={needsWatering}
                         history={history}
-                        historyFilter={historyFilter}
-                        onHistoryFilterChange={(value) => setHistoryFilter(value)}
-                        historyDate={historyDate}
-                        onHistoryDateChange={(value) => setHistoryDate(value)}
-                        onClearHistory={clearHistory}
-                        canControl={canControl}
                         thresholds={deployedThresholds}
                         maxWaterDistance={maxWaterDistance}
                       />

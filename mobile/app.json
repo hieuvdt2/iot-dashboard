@@ -20,7 +20,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.iot.dashboard"
     },
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "plugins": [],
     "extra": {
       "eas": {

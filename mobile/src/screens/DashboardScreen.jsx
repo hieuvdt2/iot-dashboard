@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   RefreshControl, ActivityIndicator, SafeAreaView,
@@ -15,6 +15,8 @@ function Icon({ lib = 'ion', name, size = 18, color = '#4a7a5a' }) {
 }
 import { useMqtt } from '../MqttContext';
 import { firebaseService } from '../services/firebaseService';
+import HistoryDetailSheet from '../components/HistoryDetailSheet';
+import WeatherDayChart from '../components/WeatherDayChart';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -56,35 +58,24 @@ function norm(raw) {
 
 const FIELDS = ['temperature', 'soilHum', 'airHum', 'light', 'waterLevel'];
 
-function aggHour(entries) {
-  const nowH = new Date().getHours();
-  const map  = new Map();
-  entries.forEach((e) => {
-    if (!e.ts) return;
-    const h = new Date(e.ts).getHours();
-    if (h > nowH) return; // only past & current hours
-    const label = `${String(h).padStart(2, '0')}:00`;
-    if (!map.has(h)) {
-      map.set(h, { label, _s: {}, _c: {} });
-      FIELDS.forEach((f) => { map.get(h)._s[f] = 0; map.get(h)._c[f] = 0; });
-    }
-    const b = map.get(h);
-    FIELDS.forEach((f) => { if (e[f] != null) { b._s[f] += Number(e[f]); b._c[f]++; } });
-  });
-  return [...map.entries()].sort((a, b) => a[0] - b[0]).map(([h, b]) => {
-    const r = { time: h === nowH ? 'Hiện tại' : b.label, hour: h };
-    FIELDS.forEach((f) => { r[f] = b._c[f] > 0 ? Math.round(b._s[f] / b._c[f] * 10) / 10 : null; });
-    return r;
-  });
+function localDateKey(ts) {
+  const d = new Date(Number(ts));
+  if (Number.isNaN(d.getTime())) return null;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function aggDay(entries) {
   const map = new Map();
+  const todayKey = localDateKey(Date.now());
   entries.forEach((e) => {
     if (!e.ts) return;
-    const d   = new Date(e.ts);
-    const key = d.toISOString().slice(0, 10);
-    const lbl = key === new Date().toISOString().slice(0, 10)
+    const key = localDateKey(e.ts);
+    if (!key) return;
+    const d = new Date(Number(e.ts));
+    const lbl = key === todayKey
       ? 'Hôm nay'
       : `${VN_DAY[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`;
     if (!map.has(key)) {
@@ -94,8 +85,8 @@ function aggDay(entries) {
     const b = map.get(key);
     FIELDS.forEach((f) => { if (e[f] != null) b._vals[f].push(Number(e[f])); });
   });
-  return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([, b]) => {
-    const r = { time: b.label };
+  return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([dateKey, b]) => {
+    const r = { time: b.label, dateKey };
     FIELDS.forEach((f) => {
       const v = b._vals[f];
       if (!v.length) { r[`${f}_min`] = null; r[`${f}_max`] = null; r[`${f}_avg`] = null; return; }
@@ -379,34 +370,41 @@ const sg = StyleSheet.create({
   },
 });
 
-/* ── Hourly Strip ─────────────────────────────────────────────────────────── */
+function offsetLocalDateKey(dateKey, delta) {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const dt = new Date(y, m - 1, d, 12, 0, 0, 0);
+  dt.setDate(dt.getDate() + delta);
+  return localDateKey(dt.getTime());
+}
+
+async function loadEntriesForDate(dateKey) {
+  const data = await firebaseService.getHistoryForDate(dateKey);
+  if (!data) return [];
+  return Object.values(data)
+    .map(norm)
+    .filter((e) => e.ts > 0)
+    .sort((a, b) => a.ts - b.ts);
+}
+
+/* ── Biểu đồ 24h hôm nay (Apple Weather style) ───────────────────────────── */
 
 const HOURLY_SENSORS = [
-  { key: 'temperature', lib: 'mci', icon: 'thermometer',       unit: '°',  color: '#ff8080' },
-  { key: 'soilHum',     lib: 'mci', icon: 'sprout',            unit: '%',  color: '#4ade80' },
-  { key: 'airHum',      lib: 'ion', icon: 'water-outline',     unit: '%',  color: '#60a5fa' },
-  { key: 'light',       lib: 'ion', icon: 'sunny-outline',     unit: '',   color: '#fbbf24' },
+  { key: 'temperature', lib: 'mci', icon: 'thermometer',       unit: '°',  color: '#ef4444' },
+  { key: 'soilHum',     lib: 'mci', icon: 'sprout',            unit: '%',  color: '#22c55e' },
+  { key: 'airHum',      lib: 'ion', icon: 'water-outline',     unit: '%',  color: '#3b82f6' },
+  { key: 'light',       lib: 'ion', icon: 'sunny-outline',     unit: '',   color: '#f59e0b' },
 ];
 
-function HourlyStrip({ hourlyData }) {
+function TodayTrendChart({ todayEntries, yesterdayEntries, sensorData }) {
   const [activeSensor, setActiveSensor] = useState('temperature');
-  const meta      = HOURLY_SENSORS.find((s) => s.key === activeSensor) ?? HOURLY_SENSORS[0];
-  const now       = new Date().getHours();
-  const scrollRef = useRef(null);
-
-  // Auto-scroll to the rightmost (most recent) item
-  useEffect(() => {
-    if (hourlyData.length > 0) {
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 100);
-    }
-  }, [hourlyData]);
+  const meta = HOURLY_SENSORS.find((s) => s.key === activeSensor) ?? HOURLY_SENSORS[0];
+  const liveValue = sensorData?.[activeSensor] ?? null;
 
   return (
     <GlassCard>
-      {/* Header */}
       <View style={hs.header}>
-        <Text style={hs.headerTitle}>⏱ DIỄN BIẾN HÔM NAY</Text>
-        <Text style={hs.headerSub}>Dữ liệu ghi nhận theo giờ</Text>
+        <Text style={hs.headerTitle}>📈 DIỄN BIẾN HÔM NAY</Text>
+        <Text style={hs.headerSub}>Trái → phải theo giờ · Hôm qua nét đứt</Text>
       </View>
 
       <SensorSegmentBar
@@ -418,48 +416,29 @@ function HourlyStrip({ hourlyData }) {
 
       <View style={hs.divider} />
 
-      {/* Hourly items — scroll to end (most recent) */}
-      <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false}>
-        <View style={hs.row}>
-          {hourlyData.length === 0 ? (
-            <View style={hs.empty}>
-              <Text style={{ color: TEXT_DIM, fontSize: 13 }}>Chưa có dữ liệu hôm nay</Text>
-            </View>
-          ) : hourlyData.map((item, i) => {
-            const val   = item[activeSensor];
-            const isNow = item.hour === now;
-            return (
-              <View key={i} style={[hs.item, isNow && hs.itemNow]}>
-                <Text style={[hs.itemTime, isNow && { color: TEXT_WHITE, fontWeight: '700' }]}>
-                  {item.time}
-                </Text>
-                <View style={{ marginVertical: 6 }}>
-                  <Icon lib={meta.lib} name={meta.icon} size={22}
-                    color={isNow ? (meta.color ?? TEXT_DARK) : TEXT_MED} />
-                </View>
-                <Text style={[hs.itemVal, isNow && { color: meta.color ?? TEXT_WHITE }]}>
-                  {val != null ? `${Math.round(val)}${meta.unit}` : '--'}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
-      </ScrollView>
+      <View style={hs.chartWrap}>
+        <WeatherDayChart
+          selectedEntries={todayEntries}
+          compareEntries={yesterdayEntries}
+          sensorKey={activeSensor}
+          color={meta.color}
+          unit={meta.unit}
+          liveValue={liveValue}
+          selectedLabel="Hôm nay"
+          compareLabel="Hôm qua"
+          showCompare={yesterdayEntries.length > 0}
+        />
+      </View>
     </GlassCard>
   );
 }
 
 const hs = StyleSheet.create({
-  header:       { padding: 12, paddingBottom: 4 },
-  headerTitle:  { fontSize: 12, color: TEXT_DIM, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase' },
-  headerSub:    { fontSize: 11, color: TEXT_DIM, opacity: 0.7, marginTop: 2, marginBottom: 6 },
-  divider:      { height: 1, backgroundColor: CARD_BORDER, marginHorizontal: 12 },
-  row:          { flexDirection: 'row', paddingVertical: 14, paddingHorizontal: 8 },
-  item:         { alignItems: 'center', paddingHorizontal: 14 },
-  itemNow:      { backgroundColor: '#e8f5ed', borderRadius: 20, paddingVertical: 4 },
-  itemTime:     { fontSize: 12, color: TEXT_DIM, fontWeight: '500' },
-  itemVal:      { fontSize: 15, fontWeight: '700', color: TEXT_WHITE },
-  empty:        { paddingHorizontal: 20, paddingVertical: 16 },
+  header:     { padding: 12, paddingBottom: 4 },
+  headerTitle:{ fontSize: 12, color: TEXT_DIM, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase' },
+  headerSub:  { fontSize: 11, color: TEXT_DIM, opacity: 0.7, marginTop: 2, marginBottom: 6 },
+  divider:    { height: 1, backgroundColor: CARD_BORDER, marginHorizontal: 12 },
+  chartWrap:  { paddingHorizontal: 8, paddingBottom: 8 },
 });
 
 /* ── Daily List (lịch sử 7 ngày) ────────────────────────────────────────── */
@@ -486,7 +465,7 @@ const rb = StyleSheet.create({
   fill:  { position: 'absolute', top: 0, height: '100%', borderRadius: 999 },
 });
 
-function DailyList({ dailyData }) {
+function DailyList({ dailyData, onDayPress }) {
   const [activeSensor, setActiveSensor] = useState('temperature');
   const meta = DAILY_SENSORS.find((s) => s.key === activeSensor) ?? DAILY_SENSORS[0];
 
@@ -504,7 +483,7 @@ function DailyList({ dailyData }) {
       {/* Header */}
       <View style={dl.header}>
         <Text style={dl.headerTitle}>📜 LỊCH SỬ 30 NGÀY QUA</Text>
-        <Text style={dl.headerSub}>Thấp · Trung bình · Cao mỗi ngày</Text>
+        <Text style={dl.headerSub}>Thấp · Trung bình · Cao mỗi ngày · Chạm để xem chi tiết</Text>
         <SensorSegmentBar
           sensors={DAILY_SENSORS}
           activeKey={activeSensor}
@@ -522,27 +501,28 @@ function DailyList({ dailyData }) {
         const mn  = day[`${activeSensor}_min`];
         const mx  = day[`${activeSensor}_max`];
         const avg = day[`${activeSensor}_avg`];
+        const openDetail = () => {
+          if (!day.dateKey || !onDayPress) return;
+          onDayPress({ dateKey: day.dateKey, sensorKey: activeSensor, dayStats: day });
+        };
         return (
-          <View key={i}>
+          <View key={day.dateKey ?? i}>
             {i > 0 && <View style={dl.rowDivider} />}
-            <View style={dl.row}>
-              {/* Day */}
+            <TouchableOpacity
+              style={dl.row}
+              onPress={openDetail}
+              activeOpacity={0.65}
+              disabled={!day.dateKey}
+            >
               <Text style={dl.dayName}>{day.time}</Text>
-
-              {/* Avg */}
               <Text style={[dl.avg, { color: meta.color }]}>
                 {avg != null ? `${avg.toFixed(0)}${meta.unit}` : '--'}
               </Text>
-
-              {/* Min */}
               <Text style={dl.minVal}>{mn != null ? `${mn.toFixed(0)}${meta.unit}` : '--'}</Text>
-
-              {/* Range bar */}
               <RangeBar min={mn} max={mx} globalMin={globalMin} globalMax={globalMax} color={meta.color} />
-
-              {/* Max */}
               <Text style={dl.maxVal}>{mx != null ? `${mx.toFixed(0)}${meta.unit}` : '--'}</Text>
-            </View>
+              <Ionicons name="chevron-forward" size={16} color={TEXT_DIM} style={{ marginLeft: 2 }} />
+            </TouchableOpacity>
           </View>
         );
       })}
@@ -1008,8 +988,10 @@ export default function DashboardScreen() {
   const [refreshing,    setRefreshing]    = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [maxWaterDist,  setMaxWaterDist]  = useState(DEFAULT_MAX_WATER_DIST);
-  const [hourlyData,    setHourlyData]    = useState([]);
+  const [todayEntries, setTodayEntries] = useState([]);
+  const [yesterdayEntries, setYesterdayEntries] = useState([]);
   const [dailyData,     setDailyData]     = useState([]);
+  const [historyDetail, setHistoryDetail] = useState(null);
 
   // Load maxWaterDistance from storage
   useEffect(() => {
@@ -1024,14 +1006,15 @@ export default function DashboardScreen() {
 
   const loadChartData = useCallback(async () => {
     try {
-      // Hourly: today
-      const today   = new Date().toISOString().slice(0, 10);
-      const dayData = await firebaseService.getHistoryForDate(today);
-      if (dayData) {
-        const entries = Object.values(dayData).map(norm).filter((e) => e.ts > 0);
-        entries.sort((a, b) => a.ts - b.ts);
-        setHourlyData(aggHour(entries));
-      }
+      const todayKey = localDateKey(Date.now());
+      const yesterdayKey = offsetLocalDateKey(todayKey, -1);
+
+      const [today, yesterday] = await Promise.all([
+        loadEntriesForDate(todayKey),
+        loadEntriesForDate(yesterdayKey),
+      ]);
+      setTodayEntries(today);
+      setYesterdayEntries(yesterday);
 
       // Daily: last 30 days
       const keys     = getDateKeys(30);
@@ -1093,10 +1076,17 @@ export default function DashboardScreen() {
           />
 
           {/* Hourly strip */}
-          <HourlyStrip hourlyData={hourlyData} />
+          <TodayTrendChart
+            todayEntries={todayEntries}
+            yesterdayEntries={yesterdayEntries}
+            sensorData={sensorData}
+          />
 
           {/* Lịch sử 30 ngày qua */}
-          <DailyList dailyData={dailyData} />
+          <DailyList
+            dailyData={dailyData}
+            onDayPress={(payload) => setHistoryDetail(payload)}
+          />
 
           {/* Detail cards: nhiệt độ, đất, ánh sáng, độ ẩm KK, mực nước, so sánh */}
           <DetailCards
@@ -1111,6 +1101,15 @@ export default function DashboardScreen() {
           <View style={{ height: 24 }} />
         </ScrollView>
       </SafeAreaView>
+
+      <HistoryDetailSheet
+        visible={!!historyDetail}
+        dateKey={historyDetail?.dateKey}
+        sensorKey={historyDetail?.sensorKey}
+        dayStats={historyDetail?.dayStats}
+        dailyData={dailyData}
+        onClose={() => setHistoryDetail(null)}
+      />
     </View>
   );
 }
