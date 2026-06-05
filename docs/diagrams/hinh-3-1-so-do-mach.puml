@@ -1,0 +1,62 @@
+@startuml
+' Hình 3.1 - Sơ đồ kết nối phần cứng ESP32 và cảm biến
+' Render: https://www.plantuml.com/plantuml/uml/
+
+skinparam shadowing false
+skinparam roundcorner 10
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam linetype ortho
+skinparam componentStyle rectangle
+skinparam nodesep 80
+skinparam ranksep 75
+skinparam padding 14
+skinparam packagePadding 32
+skinparam noteMargin 20
+
+left to right direction
+
+rectangle "ESP32-WROOM-32\n(CH340, Wi-Fi)" as ESP #FFF8E1
+
+package "Cảm biến môi trường" as PKG_S #E3F2FD {
+  component "DHT11" as DHT
+  component "Soil Moisture\nSensor V1.2" as SOIL
+  component "HC-SR04" as US
+  component "BH1750" as LUX
+  DHT -[hidden]down- SOIL
+  SOIL -[hidden]down- US
+  US -[hidden]down- LUX
+}
+
+package "Điều khiển" as PKG_A #FFEBEE {
+  component "Relay 5V" as REL
+  component "Máy bơm mini" as PUMP
+  component "Công tắc cơ" as SW #ECEFF1
+  REL -[hidden]down- PUMP
+  PUMP -[hidden]down- SW
+}
+
+PKG_S -[hidden]right--- ESP
+PKG_A -[hidden]left--- ESP
+
+DHT -right-> ESP : DATA → GPIO 4\nVCC 3.3V, GND
+SOIL -right-> ESP : AOUT → GPIO 34\n(ADC)\nVCC, GND
+US -right-> ESP : TRIG GPIO 5\nECHO GPIO 18\nVCC 5V, GND
+LUX -right-> ESP : SDA GPIO 21\nSCL GPIO 22\n3.3V, GND
+
+ESP -right-> REL : IN → GPIO 27\n(active LOW)
+REL -right-> PUMP : cò NO\nnguồn bơm riêng
+ESP -down-> SW : GPIO 14\n(tùy chọn)
+
+note bottom of PKG_S #F5F5F5
+  Breadboard, dây nối.
+  Điện trở 1kΩ–2kΩ (nếu cần).
+end note
+
+note bottom of ESP #FFFDE7
+  GND chung. Relay/bơm: nguồn 5V riêng.
+  ESP32: MQTT qua Wi-Fi (publish sensor,
+  subscribe control/config).
+end note
+
+@enduml

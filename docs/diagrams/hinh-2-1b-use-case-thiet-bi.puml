@@ -1,0 +1,65 @@
+@startuml hinh_2_1b_use_case_thiet_bi
+' Hình 2.1b - Dùng package thay rectangle (tiêu đề tiếng Việt không mất dấu trên plantuml.com)
+
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam defaultFontName "DejaVu Sans"
+skinparam packageFontName "DejaVu Sans"
+skinparam usecaseFontName "DejaVu Sans"
+skinparam actorFontName "DejaVu Sans"
+skinparam noteFontName "DejaVu Sans"
+skinparam defaultFontSize 12
+skinparam packageStyle rectangle
+skinparam linetype ortho
+skinparam nodesep 40
+skinparam ranksep 55
+
+title Hình 2.1b - Use case thiết bị và đồng bộ dữ liệu
+
+top to bottom direction
+
+actor "ESP32\n(cảm biến + relay)" as esp #FFF3E0
+actor "Máy chủ bridge\n(tùy chọn)" as srv #ECEFF1
+
+package "MQTT và Firebase" as CLOUD #F5F5F5 {
+
+  usecase "Gửi dữ liệu cảm biến\n(topic esp32/sensor)" as UC1 #C8E6C9
+  usecase "Nhận lệnh bơm / AUTO\n(topic esp32/control)" as UC56 #FFCCBC
+  usecase "Nhận cấu hình ngưỡng\n(topic esp32/config)" as UC7 #FFE0B2
+  usecase "Ghi lịch sử lên Firebase\n(latest / history)" as UC12 #B3E5FC
+
+  UC1 -[hidden]right- UC56
+  UC56 -[hidden]right- UC7
+  UC1 -[hidden]down- UC12
+}
+
+package "Phần cứng tại vườn" as HW #FAFAFA {
+  usecase "Đọc cảm biến\nmôi trường" as READ
+  usecase "Điều khiển\nrelay và máy bơm" as ACT
+  READ -[hidden]right- ACT
+}
+
+CLOUD -[hidden]right- HW
+
+esp --> UC56
+esp --> UC7
+esp --> READ
+
+READ -left-> UC1
+UC56 -right-> ACT
+UC7 -right-> ACT
+
+srv -right-> UC12
+
+note bottom of UC12 #E3F2FD
+  Máy chủ subscribe esp32/sensor
+  trên broker rồi ghi Firebase
+end note
+
+note left of srv #ECEFF1
+  Không bắt buộc chạy máy chủ.
+  Web/Mobile vẫn xem realtime
+  qua MQTT và đọc Firebase.
+end note
+
+@enduml

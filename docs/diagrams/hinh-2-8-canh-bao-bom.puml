@@ -1,0 +1,36 @@
+@startuml
+' Hình 2.8 - Luồng cảnh báo và điều khiển bơm (mục 2.5.3)
+' Render: https://www.plantuml.com/plantuml/uml/
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam activityBackgroundColor #FAFAFA
+skinparam activityBorderColor #37474F
+
+start
+
+:Nhận payload cảm biến\n(MQTT esp32/sensor\nhoặc Firebase latest);
+
+:So sánh với cấu hình ngưỡng\n(minSoil, maxTemp, ...);
+
+if (Có chỉ số vượt ngưỡng\nvà đã có config?) then (có)
+  :Sinh danh sách alerts\n(đất khô, nhiệt độ cao, ...);
+else (không)
+endif
+
+:Xác định garden_status\n(TOT / CAN_CHU_Y / NGUY_HIEM\nhoặc từ firmware);
+
+:Hiển thị banner cảnh báo,\nmàu thẻ, toast;
+
+if (Người dùng là admin?) then (có)
+  :Bấm bật/tắt bơm\nhoặc AUTO;
+  :publish esp32/control\n(bat_bom, tat_bom, auto_on, auto_off);
+  :ESP32 điều khiển relay;
+else (viewer)
+  :Chỉ xem, không publish;
+endif
+
+stop
+
+@enduml

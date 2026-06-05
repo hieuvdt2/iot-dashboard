@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const mqtt = require('mqtt');
 const express = require('express');
+const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
@@ -42,18 +43,34 @@ const DEVICE_ID = process.env.DEVICE_ID || 'esp32_01';
 
 let firebaseReady = false;
 let firebaseDb = null;
+let firebaseInitError = null;
+
+function loadServiceAccount() {
+  const rawJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (rawJson) {
+    return JSON.parse(rawJson);
+  }
+  const accountPath =
+    process.env.FIREBASE_SERVICE_ACCOUNT ||
+    path.join(__dirname, 'smart-garden-firebase.json');
+  return require(accountPath);
+}
 
 try {
-  const serviceAccount = require(FIREBASE_SERVICE_ACCOUNT);
+  const serviceAccount = loadServiceAccount();
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
     databaseURL: FIREBASE_DB_URL,
   });
   firebaseDb = admin.database();
   firebaseReady = true;
-  console.log('[Firebase] Connected');
+  console.log('[Firebase] Admin SDK connected');
 } catch (err) {
+  firebaseInitError = err.message;
   console.error('[Firebase] Init error:', err.message);
+  console.error(
+    '[Firebase] Trên Render: thêm env FIREBASE_SERVICE_ACCOUNT_JSON (nội dung file JSON service account)',
+  );
 }
 
 const normalizeSensorPayload = (data) => {
@@ -128,24 +145,51 @@ const writeConfigToFirebase = async (config) => {
 // ===== EXPRESS + SOCKET.IO =====
 const app = express();
 const server = http.createServer(app);
-const corsOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
-  : '*';
+function parseCorsOrigins() {
+  const raw = (process.env.CORS_ORIGIN || '').trim();
+  if (!raw || raw === '*') return true;
+  return raw.split(',').map((origin) => origin.trim()).filter(Boolean);
+}
+
+const corsOrigins = parseCorsOrigins();
+
+const corsOptions = {
+  origin: corsOrigins,
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  maxAge: 86400,
+};
 
 const io = new Server(server, {
   cors: {
-    origin: corsOrigins,
-    methods: ['GET', 'POST'],
+    origin: corsOrigins === true ? '*' : corsOrigins,
+    methods: ['GET', 'POST', 'OPTIONS'],
   },
 });
 
-// Serve web build if available
 const buildPath = path.join(__dirname, '../build');
-app.use(express.static(buildPath));
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json());
 
-// API: last sensor data
+// ===== API (đăng ký trước static để không bị che) =====
 let lastSensorData = null;
+
+app.get('/api/health', (req, res) => {
+  res.json({
+    ok: true,
+    firebase: firebaseReady,
+    firebaseError: firebaseInitError,
+    routes: [
+      'GET /api/health',
+      'GET /api/sensor',
+      'GET /api/assistant/status',
+      'POST /api/admin/sync-users',
+      'POST /api/assistant/chat',
+    ],
+  });
+});
+
 app.get('/api/sensor', (req, res) => {
   res.json({ data: lastSensorData, timestamp: new Date().toISOString() });
 });
@@ -156,6 +200,51 @@ app.get('/api/assistant/status', (req, res) => {
     enabled: Boolean(provider),
     provider: provider || null,
   });
+});
+
+/** GET vào URL sync — trình duyệt dùng GET; API thật là POST */
+app.get('/api/admin/sync-users', (req, res) => {
+  res.status(405).json({
+    error: 'Endpoint này chỉ nhận POST. Dùng nút trên trang Quản trị hoặc: curl -X POST https://.../api/admin/sync-users',
+  });
+});
+
+/** Đồng bộ mọi user Firebase Authentication → RTDB users/ + roles/ */
+app.post('/api/admin/sync-users', async (req, res) => {
+  if (!firebaseReady || !firebaseDb) {
+    return res.status(503).json({ error: 'Firebase Admin chưa sẵn sàng' });
+  }
+  try {
+    const updates = {};
+    let synced = 0;
+    let nextPageToken;
+    do {
+      const listResult = await admin.auth().listUsers(1000, nextPageToken);
+      for (const record of listResult.users) {
+        const uid = record.uid;
+        const createdAt = record.metadata?.creationTime
+          ? new Date(record.metadata.creationTime).getTime()
+          : Date.now();
+        updates[`users/${uid}/email`] = record.email || '';
+        updates[`users/${uid}/createdAt`] = createdAt;
+        synced += 1;
+        const roleSnap = await firebaseDb.ref(`roles/${uid}`).once('value');
+        if (!roleSnap.val()) {
+          updates[`roles/${uid}`] = 'viewer';
+        }
+      }
+      nextPageToken = listResult.pageToken;
+    } while (nextPageToken);
+
+    if (Object.keys(updates).length > 0) {
+      await firebaseDb.ref().update(updates);
+    }
+    console.log(`[Admin] Synced ${synced} auth users to RTDB`);
+    res.json({ ok: true, count: synced });
+  } catch (err) {
+    console.error('[Admin] sync-users error:', err.message);
+    res.status(500).json({ error: err.message || 'Không thể đồng bộ' });
+  }
 });
 
 app.post('/api/assistant/chat', async (req, res) => {
@@ -171,8 +260,18 @@ app.post('/api/assistant/chat', async (req, res) => {
   }
 });
 
-// SPA fallback
+// Static web build (sau API)
+app.use(express.static(buildPath));
+
+// SPA fallback — không áp dụng cho /api/*
 app.get('*', (req, res) => {
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({
+      error: 'API không tồn tại. Có thể server Render chưa deploy bản mới — kiểm tra GET /api/health',
+      path: req.path,
+      method: req.method,
+    });
+  }
   const indexPath = path.join(buildPath, 'index.html');
   const fs = require('fs');
   if (fs.existsSync(indexPath)) {
@@ -280,5 +379,11 @@ server.listen(PORT, () => {
   console.log(`   Topics:  ${TOPICS.SENSOR} (sub), ${TOPICS.CONTROL} (pub)\n`);
   console.log(`   Firebase: ${firebaseReady ? 'ready' : 'not ready'}`);
   console.log(`   Device:   ${DEVICE_ID}`);
-  console.log(`   AI:       ${pickProvider() || 'disabled (set GEMINI_API_KEY or OPENAI_API_KEY)'}\n`);
+  const aiProvider = pickProvider();
+  if (aiProvider) {
+    console.log(`   AI:       ${aiProvider} (ready)`);
+  } else {
+    console.log('   AI:       DISABLED — thêm GEMINI_API_KEY vào server/.env rồi restart');
+  }
+  console.log(`   CORS:     ${process.env.CORS_ORIGIN?.trim() || 'all origins'}\n`);
 });

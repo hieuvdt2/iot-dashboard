@@ -1,4 +1,5 @@
 import mqtt from 'mqtt';
+import { normalizeSensorPayload } from '../utils/normalizeSensor';
 
 const MQTT_URL = 'wss://916cc55df8ed4fa2bfff8e4d25fd0f56.s1.eu.hivemq.cloud:8884/mqtt';
 const MQTT_OPTIONS = {
@@ -10,121 +11,77 @@ const MQTT_OPTIONS = {
   connectTimeout: 10000,
 };
 
-const normalizeSensorPayload = (data) => {
-  if (!data || typeof data !== 'object') return data;
+const SENSOR_TOPIC  = 'esp32/sensor';
+const CONTROL_TOPIC = 'esp32/control';
 
-  const normalized = { ...data };
-
-  if (data.soil !== undefined && normalized.do_am_dat === undefined) {
-    normalized.do_am_dat = data.soil;
-  }
-  if (data.temp !== undefined && normalized.nhiet_do === undefined) {
-    normalized.nhiet_do = data.temp;
-  }
-  if (data.humi !== undefined && normalized.do_am_khong_khi === undefined) {
-    normalized.do_am_khong_khi = data.humi;
-  }
-  if (data.lux !== undefined && normalized.anh_sang === undefined) {
-    normalized.anh_sang = data.lux;
-  }
-  if (data.distance !== undefined && normalized.muc_nuoc === undefined) {
-    normalized.muc_nuoc = data.distance;
-  }
-
-  if (data.config !== undefined && normalized.has_config === undefined) {
-    normalized.has_config = data.config;
-  }
-  if (data.auto !== undefined && normalized.auto_mode === undefined) {
-    normalized.auto_mode = data.auto ? 'BAT' : 'TAT';
-  }
-  if (data.pump !== undefined && normalized.trang_thai_bom === undefined) {
-    normalized.trang_thai_bom = data.pump ? 'DANG_TUOI' : 'KHONG_TUOI';
-  }
-
-  return normalized;
-};
-
-export const TOPICS = {
-  SENSOR: 'esp32/sensor',
-  CONTROL: 'esp32/control',
-};
-
-class MqttService {
+export default class MqttService {
   constructor() {
     this.client = null;
     this.listeners = new Map();
-    this.connected = false;
-    this.connecting = false;
   }
 
-  connect() {
-    if (this.client || this.connecting) return;
-    this.connecting = true;
-
-    this.client = mqtt.connect(MQTT_URL, MQTT_OPTIONS);
-
-    this.client.on('connect', () => {
-      this.connected = true;
-      this.connecting = false;
-      console.log('[MQTT Mobile] Connected');
-      this.client.subscribe(TOPICS.SENSOR);
-      this._emit('connect', true);
-      this._emit('status', 'connected');
-    });
-
-    this.client.on('message', (topic, message) => {
-      if (topic === TOPICS.SENSOR) {
-        try {
-          const data = JSON.parse(message.toString());
-          this._emit('sensor', normalizeSensorPayload(data));
-        } catch (e) {
-          console.error('[MQTT Mobile] Parse error:', e);
-        }
-      }
-    });
-
-    this.client.on('reconnect', () => {
-      this._emit('status', 'reconnecting');
-    });
-
-    this.client.on('disconnect', () => {
-      this.connected = false;
-      this._emit('connect', false);
-      this._emit('status', 'disconnected');
-    });
-
-    this.client.on('error', (err) => {
-      console.error('[MQTT Mobile] Error:', err);
-      this.connected = false;
-      this.connecting = false;
-      this._emit('connect', false);
-      this._emit('status', 'error');
-    });
+  on(event, fn) {
+    if (!this.listeners.has(event)) this.listeners.set(event, []);
+    this.listeners.get(event).push(fn);
   }
 
-  publishControl(command) {
-    if (this.client && this.connected) {
-      this.client.publish(TOPICS.CONTROL, command, { qos: 1 });
-    }
-  }
-
-  on(event, listener) {
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, []);
-    }
-    this.listeners.get(event).push(listener);
-  }
-
-  off(event, listener) {
+  off(event, fn) {
     if (this.listeners.has(event)) {
-      const filtered = this.listeners.get(event).filter((l) => l !== listener);
-      this.listeners.set(event, filtered);
+      this.listeners.set(event, this.listeners.get(event).filter(l => l !== fn));
     }
   }
 
   _emit(event, data) {
-    if (this.listeners.has(event)) {
-      this.listeners.get(event).forEach((l) => l(data));
+    (this.listeners.get(event) || []).forEach(fn => fn(data));
+  }
+
+  connect() {
+    if (this.client) return;
+    try {
+      this.client = mqtt.connect(MQTT_URL, MQTT_OPTIONS);
+
+      this.client.on('connect', () => {
+        console.log('[MQTT] Connected');
+        this._emit('status', 'online');
+        this.client.subscribe(SENSOR_TOPIC, { qos: 1 });
+      });
+
+      this.client.on('message', (topic, message) => {
+        if (topic !== SENSOR_TOPIC) return;
+        try {
+          const raw = JSON.parse(message.toString());
+          const data = normalizeSensorPayload(raw);
+          this._emit('sensorData', data);
+          if (raw.pumpStatus !== undefined) {
+            this._emit('pumpStatus', raw.pumpStatus);
+          }
+          if (raw.autoMode !== undefined) {
+            this._emit('autoMode', raw.autoMode);
+          }
+        } catch (e) {
+          console.warn('[MQTT] Parse error:', e.message);
+        }
+      });
+
+      this.client.on('reconnect', () => this._emit('status', 'reconnecting'));
+
+      this.client.on('close', () => this._emit('status', 'offline'));
+
+      this.client.on('error', (err) => {
+        console.warn('[MQTT] Error:', err.message);
+        this._emit('status', 'offline');
+      });
+    } catch (err) {
+      console.warn('[MQTT] Init error:', err.message);
+      this._emit('status', 'offline');
+    }
+  }
+
+  publish(topic, payload) {
+    if (this.client?.connected) {
+      this.client.publish(topic, String(payload), { qos: 1 });
+    } else {
+      console.warn('[MQTT] Not connected — cannot publish');
     }
   }
 
@@ -132,9 +89,6 @@ class MqttService {
     if (this.client) {
       this.client.end(true);
       this.client = null;
-      this.connected = false;
     }
   }
 }
-
-export const mqttService = new MqttService();

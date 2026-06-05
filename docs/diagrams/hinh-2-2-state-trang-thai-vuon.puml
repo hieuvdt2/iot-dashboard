@@ -1,0 +1,41 @@
+@startuml hinh_2_2_state_trang_thai_vuon
+' Hình 2.2 - State diagram (cú pháp tương thích PlantUML 1.2026)
+
+skinparam shadowing false
+skinparam roundcorner 20
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 14
+skinparam ArrowColor #455A64
+skinparam state {
+  BorderColor #263238
+  FontStyle bold
+  MinWidth 150
+  Padding 16
+}
+
+title Hình 2.1b - Sơ đồ trạng thái tình trạng khu vườn
+
+top to bottom direction
+
+[*] --> CHUA
+
+state "Chưa cấu hình" as CHUA #ECEFF1
+state "Tốt" as TOT #A5D6A7
+state "Cần chú ý" as CAN #FFE082
+state "Nguy hiểm" as NGUY #EF9A9A
+
+CHUA --> TOT : đã cấu hình ngưỡng
+
+TOT --> CAN : mức 1
+CAN --> NGUY : mức 2
+
+CAN ..> TOT : hồi phục
+NGUY ..> CAN : hồi phục
+NGUY ..> TOT : hồi phục
+
+note bottom of NGUY #FAFAFA
+  Mức 1: đất < minSoil hoặc nhiệt > maxTemp hoặc KK < minAirHum
+  Mức 2: đất < minSoil-10 hoặc nhiệt > maxTemp+5 hoặc KK < minAirHum-10
+end note
+
+@enduml

@@ -1,0 +1,48 @@
+@startuml
+' Hình 3.3 - Lưu đồ hoạt động firmware ESP32
+' Render: https://www.plantuml.com/plantuml/uml/
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam activityBackgroundColor #FAFAFA
+skinparam activityBorderColor #37474F
+skinparam partitionBackgroundColor #E3F2FD
+skinparam partitionBorderColor #90CAF9
+
+start
+
+partition "setup()" {
+  :Khởi tạo GPIO, DHT11, I2C, BH1750;
+  :loadConfigFromNVS();
+  :WiFiManager / kết nối Wi-Fi;
+  :MQTT TLS HiveMQ (cổng 8883);
+  :Subscribe esp32/control,\nesp32/config;
+}
+
+repeat
+
+  :ensureMqttConnected();
+  :client.loop();
+
+  if (Nhận MQTT?) then (control/config)
+    :callback():\nxử lý bat_bom, tat_bom,\nauto_on, auto_off, ngưỡng;
+  else (không)
+  endif
+
+  :Đọc công tắc cơ (GPIO 14);
+
+  if (Đủ chu kỳ 3 giây?) then (có)
+    :Đọc DHT11, soil, HC-SR04, BH1750;
+    :updateGardenStatus();
+    :applyPumpLogic()\n(AUTO / an toàn bể cạn);
+    :publishSensorData()\ntopic esp32/sensor;
+  else (chưa)
+  endif
+
+repeat while (loop liên tục) is (có)
+->đang chạy;
+
+stop
+
+@enduml

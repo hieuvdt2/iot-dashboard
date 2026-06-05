@@ -1,21 +1,21 @@
 import React, { useMemo, useState } from 'react';
 
+// maxWaterDistance là cài đặt phần cứng, không phải thuộc tính cây trồng
+// nên không đưa vào preset. Xem mục "Cài đặt bể nước" riêng bên dưới.
 const THRESHOLD_FIELDS = [
-  { key: 'minSoil', label: 'Độ ẩm đất tối thiểu (%)' },
+  { key: 'minSoil',    label: 'Độ ẩm đất tối thiểu (%)' },
   { key: 'targetSoil', label: 'Mức độ ẩm đất mục tiêu (%)' },
-  { key: 'maxTemp', label: 'Nhiệt độ tối đa (°C)' },
-  { key: 'minAirHum', label: 'Độ ẩm KK tối thiểu (%)' },
-  { key: 'maxLux', label: 'Cường độ ánh sáng tối đa (lux)' },
-  { key: 'maxWaterDistance', label: 'Khoảng cách mực nước tối đa (cm)' },
+  { key: 'maxTemp',    label: 'Nhiệt độ tối đa (°C)' },
+  { key: 'minAirHum',  label: 'Độ ẩm KK tối thiểu (%)' },
+  { key: 'maxLux',     label: 'Cường độ ánh sáng tối đa (lux)' },
 ];
 
 const toThresholdForm = (source) => ({
-  minSoil: source.minSoil ?? '',
+  minSoil:    source.minSoil    ?? '',
   targetSoil: source.targetSoil ?? '',
-  maxTemp: source.maxTemp ?? '',
-  minAirHum: source.minAirHum ?? '',
-  maxLux: source.maxLux ?? '',
-  maxWaterDistance: source.maxWaterDistance ?? '',
+  maxTemp:    source.maxTemp    ?? '',
+  minAirHum:  source.minAirHum  ?? '',
+  maxLux:     source.maxLux     ?? '',
 });
 
 const isCompleteNumber = (value) => {
@@ -69,6 +69,8 @@ function ConfigPage({
   deployedThresholds,
   hasUnsavedDraft,
   sensorData,
+  maxWaterDistance,
+  onMaxWaterDistanceChange,
   onSelectPreset,
   onApplyDraft,
   onDiscardDraft,
@@ -105,8 +107,8 @@ function ConfigPage({
     if (activeSection === 'custom') {
       if (appliedPreset && !thresholdsEqual(draftThresholds, appliedPreset.config)) {
         setConfirmState({
-          title: 'Thay preset bằng tự cấu hình?',
-          message: `ESP32 đang áp dụng preset "${appliedPreset.name}". Gửi cấu hình tự chỉnh sẽ thay thế preset này trên thiết bị. Bạn có chắc chắn muốn tiếp tục?`,
+          title: 'Thay mẫu bằng tự cấu hình?',
+          message: `Thiết bị đang áp dụng mẫu "${appliedPreset.name}". Gửi cấu hình tự chỉnh sẽ thay thế mẫu này. Bạn có chắc chắn muốn tiếp tục?`,
           confirmLabel: 'Áp dụng tự cấu hình',
           onConfirm: runConfirmedSave,
         });
@@ -123,11 +125,11 @@ function ConfigPage({
 
       if (replacingCustom || replacingOtherPreset) {
         const currentLabel = appliedPreset
-          ? `preset "${appliedPreset.name}"`
+          ? `mẫu "${appliedPreset.name}"`
           : 'cấu hình tự chỉnh';
         setConfirmState({
-          title: 'Áp dụng preset mới?',
-          message: `Preset "${targetPreset.name}" sẽ thay thế ${currentLabel} đang chạy trên ESP32. Bạn có muốn áp dụng preset này?`,
+          title: 'Áp dụng mẫu mới?',
+          message: `Mẫu "${targetPreset.name}" sẽ thay thế ${currentLabel} đang chạy trên thiết bị. Bạn có muốn áp dụng mẫu này?`,
           confirmLabel: `Áp dụng "${targetPreset.name}"`,
           onConfirm: runConfirmedSave,
         });
@@ -148,11 +150,11 @@ function ConfigPage({
 
     if (needsConfirm) {
       const currentLabel = appliedPreset
-        ? `preset "${appliedPreset.name}"`
+        ? `mẫu "${appliedPreset.name}"`
         : 'cấu hình tự chỉnh';
       setConfirmState({
-        title: 'Chọn preset này?',
-        message: `Preset "${targetPreset.name}" sẽ thay thế ${currentLabel} trong bản nháp. Bạn vẫn cần bấm "Lưu & Gửi ESP32" để áp dụng lên thiết bị.`,
+        title: 'Chọn mẫu này?',
+        message: `Mẫu "${targetPreset.name}" sẽ thay thế ${currentLabel} trong bản nháp. Bạn vẫn cần bấm "Áp dụng lên thiết bị" để gửi lên thiết bị.`,
         confirmLabel: `Chọn "${targetPreset.name}"`,
         onConfirm: () => {
           closeConfirm();
@@ -212,9 +214,6 @@ function ConfigPage({
     }
     if (sensorData.anh_sang > selectedPresetConfig.maxLux) {
       alerts.push('Ánh sáng quá mạnh');
-    }
-    if (sensorData.muc_nuoc > selectedPresetConfig.maxWaterDistance) {
-      alerts.push('Cảnh báo: mực nước thấp');
     }
 
     let status = 'Tốt';
@@ -317,7 +316,7 @@ function ConfigPage({
     if (!canEdit) return;
     const trimmed = formValues.name.trim();
     if (!trimmed) {
-      setPresetFieldErrors({ name: 'Vui lòng nhập tên preset' });
+      setPresetFieldErrors({ name: 'Vui lòng nhập tên mẫu' });
       return;
     }
     const { errors, payload } = parseThresholdForm(formValues);
@@ -335,7 +334,7 @@ function ConfigPage({
   };
 
   const handleDeletePreset = (presetKey) => {
-    const confirmed = window.confirm('Bạn có chắc muốn xóa preset này?');
+    const confirmed = window.confirm('Bạn có chắc muốn xóa mẫu này?');
     if (!confirmed) return;
     onDeletePreset(presetKey);
   };
@@ -364,7 +363,7 @@ function ConfigPage({
             className={`config-tab ${activeSection === 'preset' ? 'active' : ''}`}
             onClick={() => setActiveSection('preset')}
           >
-            Preset cây trồng
+            Mẫu cây trồng
           </button>
         </div>
 
@@ -376,10 +375,10 @@ function ConfigPage({
                   <h3>🌿 Cấu hình AUTO</h3>
                   <div className="config-status-row">
                     <span className={`config-status ${configReady ? 'ready' : 'empty'}`}>
-                      {configReady ? 'ESP32 đã nhận cấu hình' : 'ESP32 chưa có cấu hình'}
+                      {configReady ? 'Thiết bị đã nhận cài đặt' : 'Thiết bị chưa có cài đặt'}
                     </span>
                     {hasUnsavedDraft ? (
-                      <span className="config-sync-badge pending">Chưa gửi ESP32</span>
+                      <span className="config-sync-badge pending">Chưa áp dụng</span>
                     ) : (
                       <span className="config-sync-badge synced">Đã đồng bộ</span>
                     )}
@@ -410,13 +409,13 @@ function ConfigPage({
                     onClick={handleSaveClick}
                     disabled={!canEdit || !hasUnsavedDraft}
                   >
-                    Lưu & Gửi ESP32
+                    Áp dụng lên thiết bị
                   </button>
                 </div>
               </div>
 
               <p className="config-note">
-                Chỉnh sửa tạo bản nháp trên web. ESP32 chỉ cập nhật khi bạn bấm &quot;Lưu &amp; Gửi ESP32&quot;.
+                Chỉnh sửa tạo bản nháp. Thiết bị chỉ cập nhật khi bạn bấm &quot;Áp dụng lên thiết bị&quot;.
               </p>
 
               {!canEdit && (
@@ -440,31 +439,31 @@ function ConfigPage({
                     <span>{item.label}</span>
                     <strong>{item.value ?? '--'}</strong>
                     {hasUnsavedDraft && item.value !== item.deployedValue && (
-                      <span className="config-item-old">ESP32: {item.deployedValue ?? '--'}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
+                      <span className="config-item-old">Thiết bị: {item.deployedValue ?? '--'}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
             </div>
           </div>
         ) : (
           <div className="preset-layout preset-layout-centered">
             <div className="preset-card preset-card-large">
               <div className="preset-header">
-                <h3>🌱 Preset cây trồng</h3>
-                <p>Chọn preset để xem trước — chỉ gửi ESP32 khi bấm &quot;Lưu &amp; Gửi ESP32&quot;.</p>
+                <h3>🌱 Mẫu cây trồng</h3>
+                <p>Chọn mẫu để xem trước — thiết bị chỉ cập nhật khi bấm &quot;Áp dụng lên thiết bị&quot;.</p>
               </div>
 
               <div className="config-status-row">
                 {appliedPreset ? (
                   <span className="config-status ready">
-                    ESP32 đang chạy: <strong>{appliedPreset.name}</strong>
+                    Thiết bị đang dùng: <strong>{appliedPreset.name}</strong>
                   </span>
                 ) : (
-                  <span className="config-status empty">ESP32 chưa khớp preset có sẵn</span>
+                  <span className="config-status empty">Thiết bị chưa khớp mẫu có sẵn</span>
                 )}
                 {hasUnsavedDraft ? (
-                  <span className="config-sync-badge pending">Chưa gửi ESP32</span>
+                  <span className="config-sync-badge pending">Chưa áp dụng</span>
                 ) : (
                   <span className="config-sync-badge synced">Đã đồng bộ</span>
                 )}
@@ -476,7 +475,7 @@ function ConfigPage({
                 onChange={handlePresetSelectChange}
                 disabled={!canEdit}
               >
-                <option value="">— Chọn preset —</option>
+                <option value="">— Chọn mẫu —</option>
                 {presets.map((preset) => (
                   <option key={preset.key} value={preset.key}>
                     {preset.name}
@@ -486,13 +485,13 @@ function ConfigPage({
 
               {!selectedPreset && (
                 <div className="config-draft-hint muted">
-                  Chưa chọn preset — ESP32 vẫn giữ cấu hình hiện tại.
+                  Chưa chọn mẫu — thiết bị vẫn giữ cài đặt hiện tại.
                 </div>
               )}
 
               {selectedPreset && hasUnsavedDraft && (
                 <div className="config-draft-hint">
-                  Đã chọn preset mới. Bấm &quot;Lưu &amp; Gửi ESP32&quot; để áp dụng lên thiết bị.
+                  Đã chọn mẫu mới. Bấm &quot;Áp dụng lên thiết bị&quot; để gửi lên thiết bị.
                 </div>
               )}
 
@@ -506,7 +505,7 @@ function ConfigPage({
                       <span>{item.label}</span>
                       <strong>{item.value ?? '--'}</strong>
                       {hasUnsavedDraft && item.value !== item.deployedValue && (
-                        <span className="config-item-old">ESP32: {item.deployedValue ?? '--'}</span>
+                        <span className="config-item-old">Thiết bị: {item.deployedValue ?? '--'}</span>
                       )}
                     </div>
                   ))}
@@ -520,7 +519,7 @@ function ConfigPage({
                   onClick={handleSaveClick}
                   disabled={!canEdit || !hasUnsavedDraft}
                 >
-                  Lưu & Gửi ESP32
+                  Áp dụng lên thiết bị
                 </button>
                 {hasUnsavedDraft && (
                   <button
@@ -533,13 +532,13 @@ function ConfigPage({
                   </button>
                 )}
                 <button className="btn-ghost" type="button" onClick={openCreateModal} disabled={!canEdit}>
-                  Thêm preset
+                  Thêm mẫu
                 </button>
               </div>
 
               {customPresets.length > 0 && (
                 <div className="preset-list">
-                  <div className="preset-list-title">Preset tùy chỉnh</div>
+                  <div className="preset-list-title">Mẫu tùy chỉnh</div>
                   {customPresets.map((preset) => (
                     <button
                       key={preset.key}
@@ -585,16 +584,16 @@ function ConfigPage({
             <div className="preview-card preview-card-large">
               <div className="preview-header">
                 <h3>🔎 Xem trước tình trạng vườn</h3>
-                <span>Dựa trên preset đang chọn (chưa gửi ESP32)</span>
+                <span>Dựa trên mẫu đang chọn (chưa áp dụng)</span>
               </div>
               {!selectedPreset && (
                 <div className="preview-empty">
-                  Chọn preset để xem trước ngưỡng và tình trạng vườn.
+                  Chọn mẫu để xem trước ngưỡng và tình trạng vườn.
                 </div>
               )}
               {selectedPreset && !selectedPresetConfig && (
                 <div className="preview-empty">
-                  Preset không hợp lệ.
+                  Mẫu không hợp lệ.
                 </div>
               )}
               {selectedPresetConfig && !sensorData && (
@@ -629,6 +628,52 @@ function ConfigPage({
         )}
       </section>
 
+      {/* ─── Cài đặt bể nước (device-level, không phụ thuộc loại cây) ─── */}
+      <div className="config-single" style={{ maxWidth: 680, margin: '0 auto' }}>
+        <div className="config-card" style={{ marginTop: 0 }}>
+          <div className="config-header">
+            <div>
+              <h3>🪣 Cài đặt bể nước</h3>
+              <p className="config-status" style={{ marginTop: 4 }}>
+                Ngưỡng xác định bể còn nước hay không — không phụ thuộc loại cây trồng.
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-2)', fontWeight: 600 }}>
+                Khoảng cách cảnh báo cạn bể (cm)
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="number"
+                  min="1"
+                  max="200"
+                  value={maxWaterDistance ?? 20}
+                  onChange={(e) => onMaxWaterDistanceChange(Number(e.target.value))}
+                  disabled={!canEdit}
+                  style={{
+                    width: 80, padding: '7px 10px', borderRadius: 7,
+                    border: '1px solid var(--border)', background: 'var(--bg)',
+                    color: 'var(--text)', fontSize: '0.9rem', fontFamily: 'inherit',
+                    outline: 'none',
+                  }}
+                />
+                <span style={{ fontSize: '0.82rem', color: 'var(--text-2)' }}>cm</span>
+              </div>
+            </div>
+            <div style={{
+              flex: 1, padding: '10px 14px', borderRadius: 10,
+              background: 'var(--blue-light)', border: '1px solid #bfdbfe',
+              fontSize: '0.8rem', color: '#1e40af', lineHeight: 1.55,
+            }}>
+              <strong>Cảm biến đo khoảng cách từ đầu bể xuống mặt nước.</strong><br />
+              Nếu khoảng cách &gt; {maxWaterDistance ?? 20} cm → cảnh báo &quot;Nước thấp / Cạn&quot; và khoá bơm an toàn.
+            </div>
+          </div>
+        </div>
+      </div>
+
       {confirmState && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <div className="modal-card confirm-modal">
@@ -661,7 +706,7 @@ function ConfigPage({
             </div>
             <div className="modal-body">
               <p className="modal-note">
-                Thay đổi sẽ lưu vào bản nháp. Bấm &quot;Lưu nháp&quot; rồi &quot;Lưu &amp; Gửi ESP32&quot; để áp dụng lên thiết bị.
+                Thay đổi sẽ lưu vào bản nháp. Bấm &quot;Lưu nháp&quot; rồi &quot;Áp dụng lên thiết bị&quot; để gửi lên thiết bị.
               </p>
               {Object.keys(thresholdErrors).length > 0 && (
                 <div className="form-alert">
@@ -701,14 +746,14 @@ function ConfigPage({
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <div className="modal-card modal-card-wide">
             <div className="modal-header">
-              <h3>{modalMode === 'create' ? 'Thêm preset mới' : 'Sửa preset'}</h3>
+              <h3>{modalMode === 'create' ? 'Thêm mẫu mới' : 'Sửa mẫu'}</h3>
               <button type="button" className="btn-ghost" onClick={closePresetModal}>
                 Đóng
               </button>
             </div>
             <div className="modal-body">
               <label className={`modal-field ${presetFieldErrors.name ? 'has-error' : ''}`}>
-                <span>Tên preset</span>
+                <span>Tên mẫu</span>
                 <input
                   type="text"
                   value={formValues.name}
@@ -755,7 +800,7 @@ function ConfigPage({
                 Hủy
               </button>
               <button type="button" className="btn-save" onClick={handlePresetModalSave}>
-                {modalMode === 'create' ? 'Lưu preset' : 'Cập nhật'}
+                {modalMode === 'create' ? 'Lưu mẫu' : 'Cập nhật'}
               </button>
             </div>
           </div>

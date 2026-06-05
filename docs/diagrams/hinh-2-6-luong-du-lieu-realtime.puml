@@ -1,0 +1,34 @@
+@startuml
+' Hình 2.6 - Luồng dữ liệu realtime (mục 2.5.1)
+' Render: https://www.plantuml.com/plantuml/uml/
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam sequenceMessageAlign center
+
+title Hình 2.6 - Luồng dữ liệu realtime
+
+participant "ESP32" as ESP #FFF8E1
+participant "HiveMQ\nBroker" as MQ #E8F5E9
+participant "Web / Mobile" as APP #E3F2FD
+participant "Server bridge\n(tùy chọn)" as SRV #ECEFF1
+database "Firebase\nRTDB" as FB #FFF3E0
+
+ESP -> ESP : 1. Đọc dữ liệu cảm biến
+ESP -> MQ : 2. publish\nesp32/sensor
+MQ -> APP : 3. Broker chuyển\ntới subscriber
+APP -> APP : 4. Cập nhật\ngiao diện realtime
+
+opt 5. Server bridge (nếu có)
+  MQ -> SRV : subscribe\nesp32/sensor
+  SRV -> FB : ghi latest,\nhistory/ngày/timestamp
+end
+
+note over APP #F5F5F5
+  Web đồng thời có thể
+  subscribe Firebase latest/history
+  cho biểu đồ (song song MQTT)
+end note
+
+@enduml

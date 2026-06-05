@@ -582,7 +582,7 @@ function ControlButtons({ connected, autoMode, pumpStatus, manualSwitch, manualS
           <div className="control-scene-loading" role="status" aria-live="polite">
             <div className="control-scene-spinner" aria-hidden="true" />
             <p className="control-scene-loading-title">{PENDING_LABELS[pendingCommand]}</p>
-            <p className="control-scene-loading-sub">Đang đợi ESP32 phản hồi trạng thái mới...</p>
+            <p className="control-scene-loading-sub">Đang đợi thiết bị phản hồi trạng thái mới...</p>
           </div>
         ) : isAuto ? (
           <AutoScene isWatering={isWatering} />

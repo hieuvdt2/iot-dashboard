@@ -1,0 +1,1737 @@
+﻿TRƯỜNG ĐẠI HỌC GIAO THÔNG VẬN TẢI
+KHOA CÔNG NGHỆ THÔNG TIN
+19558001016001955800101600
+ĐỒ ÁN TỐT NGHIỆP
+ĐỀ TÀI
+THIẾT KẾ VÀ XÂY DỰNG
+HỆ THỐNG VƯỜN THÔNG MINH
+Giảng viên hướng dẫn
+: ThS.Đỗ Văn Đức
+Sinh viên thực hiện
+: Vũ Đức Trọng Hiếu
+Lớp
+: CNTT 2_K28.1
+Mã sinh viên
+: 5240086
+Hà Nội – 2026
+LỜI CẢM ƠN
+Lời đầu tiên, em xin bày tỏ lòng biết ơn sâu sắc tới ThS. Đỗ Văn Đức – người đã tận tình hướng dẫn, chỉ bảo và truyền đạt cho em những kiến thức chuyên môn quý báu trong suốt quá trình thực hiện đồ án “Thiết kế và xây dựng hệ thống vườn thông minh”. Những ý kiến đóng góp, sự hỗ trợ và kinh nghiệm thực tiễn của thầy là nền tảng quan trọng giúp em hoàn thành đề tài này.
+Em xin chân thành cảm ơn Quý Thầy, Cô của Trường Đại học Giao thông Vận tải, đặc biệt là các Thầy, Cô thuộc Khoa Công nghệ Thông tin, đã tận tâm giảng dạy và trang bị cho em những kiến thức hữu ích trong suốt quá trình học tập tại trường. Đây chính là hành trang quý giá để em có thể vận dụng vào việc nghiên cứu và hoàn thành đồ án tốt nghiệp của mình.
+Trong quá trình thực hiện đề tài, mặc dù em đã cố gắng hết sức, tuy nhiên do kiến thức chuyên môn, kinh nghiệm thực tế và thời gian còn hạn chế nên báo cáo khó tránh khỏi những thiếu sót. Em rất mong nhận được sự thông cảm cùng những ý kiến đóng góp quý báu từ Quý Thầy, Cô và các bạn để em có thể hoàn thiện hơn kiến thức cũng như kỹ năng của bản thân trong tương lai.
+Cuối cùng, em xin gửi lời cảm ơn chân thành tới gia đình và bạn bè đã luôn bên cạnh động viên, hỗ trợ và tạo mọi điều kiện thuận lợi để em yên tâm học tập và hoàn thành đồ án này.
+Em xin chân thành cảm ơn!
+Hà Nội, ngày …… tháng …… năm 2025
+Sinh viên thực hiện đề tài
+Vũ Đức Trọng Hiếu
+MỤC LỤC
+PHẦN MỞ ĐẦU
+Lời cảm ơn
+Mục lục
+Danh mục các từ viết tắt
+Danh mục bảng biểu
+Danh mục hình ảnh
+Mở đầu
+Tóm tắt
+CHƯƠNG 1. TỔNG QUAN HỆ THỐNG VƯỜN THÔNG MINH
+1.1. Nông nghiệp thông minh, lý do chọn đề tài, mục tiêu và phạm vi
+1.2. Tổng quan Internet of Things (IoT)
+1.3. MQTT và Firebase
+1.4. ESP32, cảm biến, relay và bơm nước
+CHƯƠNG 2. THIẾT KẾ HỆ THỐNG GIÁM SÁT VÀ ĐIỀU KHIỂN
+2.1. Sơ đồ khối tổng thể
+2.2. Luồng dữ liệu và lưu đồ xử lý
+2.3. Thiết kế giao tiếp MQTT
+2.4. Thiết kế cơ sở dữ liệu Firebase và phân quyền
+CHƯƠNG 3. XÂY DỰNG VÀ TRIỂN KHAI HỆ THỐNG
+3.1. Phần cứng và mô hình thực nghiệm
+3.2. Firmware ESP32
+3.3. Server Node.js
+3.4. Ứng dụng Web
+3.5. Ứng dụng Mobile và Desktop
+3.6. Kiểm thử, kết quả và đánh giá
+PHẦN KẾT THÚC
+Kết luận và hướng phát triển
+Tài liệu tham khảo
+Phụ lục
+- Phụ lục F. Đối chiếu đề cương
+DANH MỤC CÁC TỪ VIẾT TẮT
+Viết tắt
+Tiếng Anh / Thuật ngữ gốc
+Nghĩa tiếng Việt
+API
+Application Programming Interface
+Giao diện lập trình ứng dụng
+AUTO
+Automatic (mode)
+Chế độ tự động (tưới/bơm)
+CI/CD
+Continuous Integration / Continuous Deployment
+Tích hợp và triển khai liên tục
+CRA
+Create React App
+Công cụ khởi tạo dự án React
+CRUD
+Create, Read, Update, Delete
+Thêm, đọc, sửa, xóa dữ liệu
+ESP32
+—
+Vi điều khiển Wi-Fi/Bluetooth của Espressif
+FCM
+Firebase Cloud Messaging
+Thông báo đẩy của Firebase
+IoT
+Internet of Things
+Internet vạn vật
+JSON
+JavaScript Object Notation
+Định dạng trao đổi dữ liệu dạng văn bản
+KK
+Không khí
+Độ ẩm không khí (trong báo cáo)
+ML
+Machine Learning
+Học máy
+MQTT
+Message Queuing Telemetry Transport
+Giao thức truyền thông IoT publish/subscribe
+MVP
+Minimum Viable Product
+Sản phẩm khả dụng tối thiểu
+QoS
+Quality of Service
+Mức chất lượng dịch vụ (MQTT)
+REST
+Representational State Transfer
+Kiểu API web phổ biến
+RTDB
+Realtime Database
+Cơ sở dữ liệu thời gian thực (Firebase)
+SPA
+Single Page Application
+Ứng dụng một trang
+TLS
+Transport Layer Security
+Bảo mật tầng vận chuyển
+UI/UX
+User Interface / User Experience
+Giao diện / Trải nghiệm người dùng
+UID
+User Identifier
+Mã định danh người dùng (Firebase Auth)
+WebSocket
+—
+Giao thức kết nối hai chiều trên web
+WSS
+WebSocket Secure
+WebSocket có mã hóa TLS
+DANH MỤC BẢNG BIỂU
+Ký hiệu
+Tên bảng
+Trang / Vị trí
+Bảng 3.1
+Danh sách mục tiêu cụ thể và trạng thái hoàn thành
+Mục 3.2
+Bảng 4.1
+Công cụ và thư viện liên quan
+Mục 4.3
+Bảng 5.1
+Điều kiện cảnh báo môi trường
+Mục 5.2.2
+Bảng 5.2
+Mã trạng thái tình trạng vườn
+Mục 5.2.2
+Bảng 5.3
+Lệnh điều khiển qua MQTT
+Mục 5.2.3
+Bảng 5.4
+Tham số ngưỡng cấu hình cây trồng
+Mục 5.2.4
+Bảng 5.5
+Yêu cầu phi chức năng và cách đáp ứng
+Mục 5.3
+Bảng 5.6
+Ánh xạ alias dữ liệu ESP32
+Mục 5.4
+Bảng 6.1
+Cấu hình kết nối MQTT (Web và Server)
+Mục 6.4
+Bảng 7.1
+Các hàm Firebase Service chính
+Mục 7.2
+Bảng 7.2
+Thành phần giao diện Web
+Mục 7.4
+Bảng 7.3
+Định tuyến (routes) ứng dụng Web
+Mục 7.4
+Bảng 7.4
+Giá trị preset mặc định theo loại cây
+Mục 7.7
+Bảng 8.1
+Biến môi trường server
+Mục 8.3
+Bảng 8.2
+Thành phần phần cứng tham chiếu
+Mục 3.1
+Bảng 9.1
+Kịch bản kiểm thử
+Mục 9.1
+Bảng 9.2
+Kết quả thử nghiệm theo thời gian
+Mục 9.3
+Bảng 9.3
+Thống kê tóm tắt thông số đo
+Mục 9.3
+Bảng 10.1
+So sánh tính năng giữa các nền tảng
+Mục 10.2
+Bảng A.1
+Danh sách dependency chính (Web)
+Phụ lục A
+Bảng 0.1
+Kế hoạch thực hiện theo đề cương
+Mục 0.3
+Bảng 0.2
+Đối chiếu công nghệ đề cương và triển khai
+Mục 0.2
+Khi xuất Word/PDF, đánh số trang thực tế và cập nhật cột “Trang” trong danh mục.
+DANH MỤC HÌNH ẢNH
+Ký hiệu
+Tên hình
+Trạng thái
+Vị trí
+Hình 6.1
+Sơ đồ kiến trúc tổng thể hệ thống Vườn Thông Minh
+Có (Mermaid)
+Mục 6.1
+Hình 8.1
+Sơ đồ kết nối phần cứng ESP32, cảm biến và relay bơm
+[Chèn ảnh]
+Mục 3.1
+Hình 9.1
+Giao diện Dashboard — thẻ cảm biến và biểu đồ
+[Chèn ảnh]
+Mục 9.4
+Hình 9.2
+Giao diện tab Cấu hình cây trồng — preset và ngưỡng
+[Chèn ảnh]
+Mục 9.4
+Hình 9.3
+Banner cảnh báo môi trường trên Dashboard
+[Chèn ảnh]
+Mục 9.4
+Hình 9.4
+Trang quản trị — phân quyền người dùng
+[Chèn ảnh]
+Mục 9.4
+Hình 9.5
+Ứng dụng Mobile (Expo) — màn hình giám sát
+[Chèn ảnh]
+Mục 9.4
+Hình 9.6
+Firebase Console — cấu trúc history theo ngày
+[Chèn ảnh]
+Mục 9.4
+MỞ ĐẦU
+Trong thế kỷ XXI, sự phát triển mạnh mẽ của khoa học công nghệ, đặc biệt là lĩnh vực Internet of Things (IoT), đã tạo ra nhiều bước tiến quan trọng trong đời sống con người. Các thiết bị thông minh như điện thoại thông minh, tivi thông minh hay các hệ thống tự động hóa ngày càng trở nên phổ biến, góp phần nâng cao chất lượng cuộc sống cũng như tối ưu hóa khả năng quản lý và điều khiển của con người.
+Song song với quá trình đô thị hóa, xu hướng nông nghiệp đô thị, vườn gia đình và trồng cây tại nhà ngày càng được nhiều người quan tâm. Tuy nhiên, việc chăm sóc cây vẫn phụ thuộc nhiều vào kinh nghiệm cảm tính. Người trồng khó xác định chính xác thời điểm cần tưới nước hoặc đánh giá các yếu tố môi trường như độ ẩm đất, nhiệt độ và độ ẩm không khí. Điều này dễ dẫn đến tình trạng tưới không hợp lý, gây lãng phí nước hoặc ảnh hưởng đến sự phát triển của cây trồng.
+Sự phát triển của công nghệ IoT cùng các nền tảng điện toán đám mây đã mở ra khả năng xây dựng các hệ thống giám sát và điều khiển thông minh với chi phí thấp. Các vi điều khiển như ESP32 có thể kết nối Internet, thu thập dữ liệu từ cảm biến và truyền dữ liệu liên tục thông qua các giao thức nhẹ như MQTT. Nhờ đó, người dùng có thể giám sát trạng thái khu vườn, nhận cảnh báo và điều khiển hệ thống tưới từ xa thông qua điện thoại thông minh hoặc giao diện web.
+Xuất phát từ nhu cầu thực tế đó, em lựa chọn thực hiện đề tài “Thiết kế và xây dựng hệ thống vườn thông minh” (đã đăng ký trong đề cương ngày 10/02/2025). Đề tài hướng đến việc xây dựng một hệ thống có khả năng giám sát các thông số môi trường và tự động điều khiển tưới nước thông qua Internet. Hệ thống sử dụng vi điều khiển ESP32 kết hợp với cảm biến, giao thức MQTT và nền tảng Firebase để thu thập, xử lý dữ liệu và điều khiển thiết bị một cách ổn định và hiệu quả.
+Việc lựa chọn đề tài được thực hiện dựa trên các tiêu chí sau:
+Tính thực tiễn cao: Hệ thống giải quyết nhu cầu chăm sóc cây tự động, có thể triển khai thử nghiệm với chi phí phần cứng thấp, phù hợp với các hộ gia đình và mô hình nông nghiệp đô thị.
+Tính học thuật: Đề tài kết hợp nhiều kiến thức đã học trong quá trình đào tạo như lập trình web/mobile, mạng máy tính (MQTT/WebSocket), cơ sở dữ liệu thời gian thực, bảo mật và phân quyền người dùng.
+Khả năng mở rộng: Nền tảng được thiết kế để có thể phát triển thêm các chức năng nâng cao như chế độ AUTO, tích hợp machine learning hoặc mở rộng quản lý đa thiết bị sau khi hoàn thiện đồ án.
+Phù hợp với năng lực và thời gian thực hiện: Đề tài tập trung chủ yếu vào phần mềm như dashboard đa nền tảng, đồng bộ dữ liệu cloud, đồng thời vẫn đảm bảo chuẩn hóa giao tiếp với phần cứng ESP32 để xây dựng một hệ thống hoàn chỉnh.
+Bên cạnh khả năng tự động hóa, hệ thống còn cho phép người dùng theo dõi trạng thái hoạt động và điều khiển thiết bị từ xa thông qua ứng dụng web hoặc thiết bị di động. Đề tài không chỉ mang ý nghĩa nghiên cứu và học tập mà còn có tính ứng dụng thực tế cao, phù hợp với xu hướng phát triển của nông nghiệp thông minh hiện nay.
+Trong quá trình thực hiện, mặc dù đã cố gắng nghiên cứu và hoàn thiện hệ thống, tuy nhiên do thời gian, kinh nghiệm và kiến thức còn hạn chế nên đồ án khó tránh khỏi những thiếu sót. Em rất mong nhận được sự góp ý từ Quý Thầy, Cô để đề tài được hoàn thiện hơn.
+2. NỘI DUNG ĐỒ ÁN GIẢI QUYẾT
+Đồ án tập trung nghiên cứu, thiết kế và hiện thực phần mềm cho hệ thống vườn thông minh dựa trên nền tảng Internet of Things (IoT). Hệ thống hướng đến khả năng giám sát môi trường và điều khiển thiết bị từ xa thông qua Internet, đồng thời đảm bảo tính trực quan, dễ sử dụng và khả năng mở rộng trong tương lai.
+Các nội dung chính mà đồ án thực hiện bao gồm:
+STT
+Nội dung cần giải quyết
+Sản phẩm / Kết quả
+1
+Thu thập và hiển thị dữ liệu cảm biến theo thời gian thực
+Xây dựng Dashboard Web/Mobile hiển thị liên tục các thông số môi trường gồm: nhiệt độ, độ ẩm không khí, độ ẩm đất, cường độ ánh sáng và mực nước. Dữ liệu được cập nhật theo thời gian thực giúp người dùng dễ dàng theo dõi trạng thái khu vườn.
+2
+Kết nối thiết bị ESP32 với
+hệ thống thông qua MQTT
+Thiết kế cơ chế giao tiếp giữa ESP32 và server bằng giao thức MQTT. Chuẩn hóa các topic như esp32/sensor, esp32/control, esp32/config cùng cấu trúc payload JSON nhằm đảm bảo tính ổn định và khả năng mở rộng hệ thống.
+3
+Lưu trữ và tra cứu lịch sử dữ liệu
+Sử dụng Firebase Realtime Database để lưu dữ liệu theo thời gian thực và lịch sử theo ngày. Cấu trúc dữ liệu gồm latest và history/{ngày} nhằm hỗ trợ tra cứu, thống kê và phân tích dữ liệu cảm biến.
+4
+Cảnh báo và đánh giá tình trạng vườn
+Xây dựng cơ chế đánh giá trạng thái môi trường dựa trên các ngưỡng cấu hình theo từng loại cây. Hệ thống hiển thị các mức trạng thái như “Tốt”, “Cần chú ý” và “Nguy hiểm” nhằm hỗ trợ người dùng đưa ra quyết định chăm sóc phù hợp.
+5
+Điều khiển bơm và chế độ tự động
+Phát triển chức năng điều khiển bật/tắt bơm nước từ xa thông qua giao diện Web/Mobile. Hệ thống hỗ trợ chế độ AUTO cho phép tự động kích hoạt bơm dựa trên ngưỡng độ ẩm đất đã cấu hình và gửi lệnh điều khiển qua MQTT.
+6
+Cấu hình theo preset cây trồng
+Thiết kế các preset dành cho nhiều loại cây phổ biến như rau, xương rồng, lan và cây cảnh. Ngoài ra, người dùng có thể tạo preset tùy chỉnh và đồng bộ dữ liệu cấu hình lên cloud để sử dụng trên nhiều thiết bị khác nhau.
+7
+Quản lý người dùng và phân quyền
+Tích hợp Firebase Authentication để quản lý tài khoản người dùng. Hệ thống hỗ trợ các vai trò như admin và viewer, giúp kiểm soát quyền truy cập và thao tác trên hệ thống.
+8
+Triển khai đa nền tảng
+Xây dựng hệ thống hoạt động trên nhiều nền tảng gồm Web (React), Mobile (Expo React Native), Desktop (Electron) và Server bridge (Node.js), đảm bảo khả năng truy cập và sử dụng linh hoạt.
+Bên cạnh các nội dung chính đã thực hiện, đồ án cũng xác định rõ phạm vi nghiên cứu nhằm tập trung vào phần mềm và khả năng kết nối hệ thống. Các nội dung không nằm trong phạm vi giải quyết của đồ án bao gồm:
+Thiết kế chi tiết mạch in (PCB) và firmware chuyên sâu cho ESP32; phần cứng chỉ được xây dựng ở mức mô hình tham chiếu phục vụ kiểm thử hệ thống.
+Triển khai hệ thống ở quy mô sản xuất lớn hoặc môi trường thương mại thực tế.
+Xây dựng mô hình machine learning hoặc AI để dự đoán nhu cầu tưới nước; nội dung này được đề xuất như một hướng phát triển trong tương lai.
+Thông qua các nội dung trên, đồ án hướng đến việc xây dựng một hệ thống vườn thông minh có tính ứng dụng thực tế, khả năng mở rộng cao và phù hợp với xu hướng phát triển của các hệ thống IoT hiện nay.
+3. PHƯƠNG PHÁP THỰC HIỆN
+Để hoàn thành đề tài “Thiết kế và xây dựng hệ thống vườn thông minh”, đồ án áp dụng kết hợp nhiều phương pháp nghiên cứu, phân tích, thiết kế và triển khai hệ thống nhằm đảm bảo tính thực tiễn, khả năng mở rộng và phù hợp với yêu cầu của bài toán. Các phương pháp được sử dụng bao gồm:
+3.1. Phương pháp phân tích và thiết kế hệ thống
+Trước khi tiến hành xây dựng hệ thống, đồ án thực hiện quá trình khảo sát và phân tích yêu cầu từ bài toán chăm sóc cây trồng trong môi trường thực tế. Các yêu cầu được chia thành hai nhóm chính gồm yêu cầu chức năng và yêu cầu phi chức năng.
+a) Phân tích yêu cầu chức năng
+Hệ thống cần đáp ứng các chức năng chính như:
+Thu thập dữ liệu từ các cảm biến môi trường.
+Hiển thị dữ liệu theo thời gian thực.
+Điều khiển thiết bị tưới nước từ xa.
+Tự động kích hoạt bơm khi độ ẩm đất xuống thấp.
+Lưu trữ lịch sử dữ liệu để theo dõi và thống kê.
+Quản lý tài khoản và phân quyền người dùng.
+Đồng bộ dữ liệu giữa nhiều nền tảng.
+b) Phân tích yêu cầu phi chức năng
+Ngoài các chức năng chính, hệ thống cần đảm bảo:
+Khả năng hoạt động ổn định theo thời gian thực.
+Giao diện trực quan, dễ sử dụng.
+Khả năng mở rộng thêm thiết bị và chức năng mới.
+Hỗ trợ đa nền tảng gồm Web, Mobile và Desktop.
+Tốc độ phản hồi nhanh và dữ liệu được đồng bộ liên tục.
+Sau quá trình phân tích, hệ thống được thiết kế theo mô hình phân lớp nhằm giúp việc triển khai và bảo trì trở nên dễ dàng hơn. Kiến trúc tổng thể của hệ thống bao gồm:
+Tầng phần cứng: ESP32 và các cảm biến môi trường.
+Tầng truyền thông: MQTT Broker trung gian truyền dữ liệu.
+Tầng xử lý ứng dụng: Web, Mobile, Desktop và Server bridge.
+Tầng lưu trữ: Firebase Realtime Database.
+[Hình 3.1. Kiến trúc tổng thể hệ thống]
+Bên cạnh đó, giao diện người dùng được thiết kế theo mô hình dashboard trực quan với nhằm tăng khả năng quan sát dữ liệu trong thời gian dài. Các thành phần hiển thị như biểu đồ, trạng thái cảnh báo và điều khiển được bố trí theo hướng tối ưu trải nghiệm người dùng.
+[Hình 3.2. Giao diện dashboard hệ thống]
+3.2. Phương pháp phát triển phần mềm lặp – tăng dần (Iterative / Incremental)
+Đồ án được triển khai theo mô hình phát triển phần mềm lặp – tăng dần nhằm đảm bảo hệ thống có thể hoạt động từng phần và dễ dàng mở rộng chức năng trong quá trình thực hiện.
+Ban đầu, hệ thống được xây dựng với các chức năng cốt lõi gồm:
+Kết nối MQTT.
+Nhận dữ liệu cảm biến từ ESP32.
+Hiển thị dữ liệu realtime trên dashboard.
+Sau khi hoàn thiện phiên bản cơ bản, các chức năng được bổ sung tuần tự theo từng giai đoạn, bao gồm:
+Biểu đồ thống kê dữ liệu.
+Lưu trữ lịch sử Firebase.
+Hệ thống cảnh báo theo ngưỡng.
+Điều khiển bơm nước từ xa.
+Chế độ AUTO.
+Cấu hình mẫu theo loại cây trồng.
+Đăng nhập và phân quyền người dùng.
+Việc phát triển theo từng bước giúp hệ thống dễ kiểm thử, dễ sửa lỗi và giảm rủi ro trong quá trình triển khai.
+Ngoài ra, mã nguồn được tổ chức theo hướng tái sử dụng nhằm giảm trùng lặp logic giữa các nền tảng. Các thành phần dùng chung được tách thành thư mục shared/, cho phép ứng dụng Web và Mobile sử dụng chung một phần logic xử lý dữ liệu và cấu hình hệ thống.
+3.3. Phương pháp thử nghiệm và kiểm thử hệ thống
+Sau khi hoàn thiện các chức năng chính, hệ thống được tiến hành kiểm thử nhằm đánh giá tính ổn định và độ chính xác của dữ liệu.
+a) Kiểm thử tích hợp
+Quá trình kiểm thử tích hợp được thực hiện bằng cách gửi các payload JSON mẫu lên MQTT Broker để mô phỏng dữ liệu từ ESP32. Dữ liệu sau đó được kiểm tra tại:
+Dashboard Web/Mobile/Desktop.
+Firebase Realtime Database.
+Server bridge Node.js.
+Mục tiêu của quá trình này là đảm bảo dữ liệu được truyền và đồng bộ chính xác giữa các thành phần trong hệ thống.
+[Hình 3.3. Kiểm thử dữ liệu MQTT]
+b) Kiểm thử chức năng
+Các chức năng chính của hệ thống được kiểm thử riêng biệt, bao gồm:
+Đăng nhập và xác thực người dùng.
+Phân quyền admin và viewer.
+Điều khiển bật/tắt bơm nước.
+Chế độ AUTO theo ngưỡng độ ẩm đất.
+Cảnh báo trạng thái môi trường.
+Tự động reconnect khi mất kết nối MQTT.
+Kết quả kiểm thử được ghi nhận dưới dạng bảng dữ liệu và ảnh chụp màn hình nhằm phục vụ đánh giá hệ thống.
+STT
+Mã TC
+Kịch bản kiểm thử
+Cách thực hiện
+Kết quả mong đợi
+Kết quả
+1
+TC01
+Kết nối MQTT trên Web
+Mở ứng dụng Web, quan sát trạng thái broker
+Hiển thị trạng thái đã kết nối (Connected)
+Pass
+2
+TC02
+Nhận dữ liệu cảm biến
+Publish JSON mẫu lên topic esp32/sensor (MQTTX / mosquitto_pub)
+Thẻ cảm biến và biểu đồ cập nhật theo thời gian thực
+Pass
+3
+TC03
+Chuẩn hóa tên trường dữ liệu
+Gửi payload dùng alias tiếng Anh (temp, soil, humi…)
+Hiển thị đúng nhãn tiếng Việt trên dashboard
+Pass
+4
+TC04
+Đăng nhập
+Đăng nhập email/mật khẩu Firebase
+Vào được trang Dashboard
+Pass
+5
+TC05
+Đăng ký tài khoản
+Tạo tài khoản mới
+Tạo thành công; vai trò mặc định người xem (viewer)
+Pass
+6
+TC06
+Phân quyền quản trị
+Tài khoản admin đổi vai trò; viewer thử vào trang quản trị
+Viewer không truy cập được chức năng quản trị/cấu hình nhạy cảm
+Pass
+7
+TC07
+Bật bơm từ xa
+Admin bấm «Bật bơm» trên Web
+Publish lệnh lên esp32/control (ví dụ bat_bom)
+Pass
+8
+TC08
+Tắt bơm từ xa
+Admin bấm «Tắt bơm»
+Publish lệnh tắt bơm lên esp32/control
+Pass
+9
+TC09
+Chế độ tự động (AUTO)
+Payload sensor có auto: true hoặc bật AUTO trên giao diện
+Nút điều khiển thủ công bị khóa khi đang AUTO
+Pass
+10
+TC10
+Cảnh báo đất khô
+Gửi do_am_dat nhỏ hơn minSoil trong cấu hình
+Hiển thị banner/trạng thái cảnh báo «Đất đang khô»
+Pass
+11
+TC11
+Cảnh báo nhiệt độ cao
+Gửi nhiet_do lớn hơn maxTemp
+Hiển thị cảnh báo nhiệt độ
+Pass
+12
+TC12
+Đánh giá tình trạng vườn
+Dữ liệu trong/ngoài ngưỡng theo mẫu cấu hình cây
+Trạng thái Tốt / Cần chú ý / Nguy hiểm phù hợp
+Pass
+13
+TC13
+Lưu mẫu cấu hình theo loại cây
+Chọn mẫu (Rau, Lan, Cây cảnh…), lưu cấu hình
+Dữ liệu lưu trên Firebase; đồng bộ ngưỡng
+Pass
+14
+TC14
+Gửi cấu hình xuống thiết bị
+Lưu cấu hình → gửi esp32/config
+Firebase config cập nhật; thiết bị nhận cấu hình (khi ESP32 online)
+Pass
+15
+TC15
+Lưu lịch sử Firebase
+Chạy server bridge + publish sensor
+Node latest và history/{ngày} có dữ liệu
+Pass
+16
+TC16
+Đồng bộ đa nền tảng
+Mở Web và Mobile cùng lúc, publish sensor
+Cả hai nền tảng cập nhật dữ liệu
+Pass
+17
+TC17
+Tự kết nối lại MQTT
+Ngắt Wi-Fi/mạng 10–30 giây rồi bật lại
+Client tự reconnect; trạng thái kết nối hiển thị lại bình thường
+Pass
+18
+TC18
+API server (nếu bật server)
+GET /api/sensor sau khi publish
+JSON trả về khớp lần đo gần nhất
+Pass
+[Bảng 3.1. Kết quả kiểm thử chức năng]
+c) Đánh giá hiệu năng
+Ngoài kiểm thử chức năng, đồ án còn đánh giá:
+Thời gian cập nhật dữ liệu realtime.
+Độ ổn định khi mất mạng và reconnect.
+Khả năng hoạt động đồng thời trên nhiều nền tảng.
+Thông qua quá trình kiểm thử, hệ thống cho thấy khả năng hoạt động ổn định và đáp ứng tốt các yêu cầu đặt ra.
+3.4. Công nghệ và công cụ sử dụng
+Đồ án sử dụng nhiều công nghệ hiện đại nhằm xây dựng hệ thống có khả năng realtime, đa nền tảng và dễ mở rộng.
+a) MQTT và HiveMQ Cloud
+MQTT được sử dụng làm giao thức truyền dữ liệu chính giữa ESP32 và hệ thống. MQTT có ưu điểm nhẹ, tốc độ truyền nhanh và phù hợp với các hệ thống IoT.
+HiveMQ Cloud được lựa chọn làm MQTT Broker do hỗ trợ:
+MQTT over WebSocket.
+Kết nối bảo mật TLS/SSL.
+Quản lý client và topic trực quan.
+Hoạt động ổn định trên Internet.
+[Hình 3.5. Kiến trúc giao tiếp MQTT]
+b) React và React Router
+Ứng dụng Web được xây dựng bằng React 19 kết hợp React Router nhằm tạo giao diện SPA (Single Page Application) có tốc độ phản hồi nhanh và dễ mở rộng.
+Ngoài ra, hệ thống sử dụng Recharts để hiển thị biểu đồ dữ liệu cảm biến theo thời gian thực.
+c) Expo và React Native
+Ứng dụng Mobile được phát triển bằng Expo và React Native nhằm hỗ trợ đa nền tảng Android/iOS với khả năng tái sử dụng logic xử lý từ ứng dụng Web.
+d) Electron
+Electron được sử dụng để đóng gói ứng dụng Desktop, cho phép chạy hệ thống trên Windows như một ứng dụng độc lập.
+e) Node.js và Express
+Server bridge được xây dựng bằng Node.js và Express, kết hợp thư viện firebase-admin, với vai trò::
+Kết nối và subscribe MQTT Broker (topic esp32/sensor, esp32/config).
+Xử lý và chuẩn hóa dữ liệu cảm biến nhận từ MQTT.
+Ghi dữ liệu lên Firebase Realtime Database (latest, history theo ngày).
+Cung cấp API REST phục vụ kiểm thử tích hợp (ví dụ GET /api/sensor)
+f) Firebase
+Firebase Authentication được sử dụng để quản lý người dùng và xác thực đăng nhập.
+Firebase Realtime Database được sử dụng để lưu trữ:
+Dữ liệu realtime mới nhất.
+Lịch sử dữ liệu cảm biến.
+Cấu hình hệ thống.
+Thông tin người dùng.
+[Hình 3.6. Cấu trúc dữ liệu Firebase]
+Nhờ việc kết hợp các công nghệ trên, hệ thống có thể hoạt động theo thời gian thực, dễ triển khai và có khả năng mở rộng trong tương lai.
+4. CẤU TRÚC CỦA ĐỒ ÁN
+Đồ án được tổ chức theo cấu trúc logic từ phần giới thiệu tổng quan, cơ sở lý thuyết, thiết kế hệ thống đến quá trình xây dựng, triển khai và đánh giá kết quả. Nội dung chính của đồ án được chia thành các chương như sau:
+Chương
+Tiêu đề
+Nội dung chính
+—
+Mở đầu
+Trình bày lý do chọn đề tài, mục tiêu nghiên cứu, nội dung giải quyết, phương pháp thực hiện và cấu trúc của đồ án.
+—
+Tóm tắt
+Tóm lược mục tiêu, phương pháp triển khai, công nghệ sử dụng và các kết quả đạt được của hệ thống.
+1
+Tổng quan hệ thống vườn thông minh
+Trình bày tổng quan về nông nghiệp thông minh và mô hình vườn thông minh; giới thiệu Internet of Things (IoT), giao thức MQTT, Firebase, ESP32 và các cảm biến sử dụng trong hệ thống.
+2
+Thiết kế hệ thống giám sát và điều khiển
+Phân tích và thiết kế kiến trúc hệ thống, sơ đồ khối tổng thể, luồng dữ liệu, giao tiếp MQTT, cấu trúc Firebase và cơ chế điều khiển thiết bị.
+3
+Xây dựng và triển khai hệ thống
+Trình bày quá trình xây dựng phần cứng, firmware ESP32, server bridge, ứng dụng Web/Mobile/Desktop và quá trình kiểm thử hệ thống.
+—
+Kết luận và hướng phát triển
+Đánh giá kết quả đạt được, các hạn chế còn tồn tại và đề xuất hướng phát triển trong tương lai.
+—
+Tài liệu tham khảo và Phụ lục
+Bao gồm các tài liệu tham khảo, mã nguồn minh họa, hình ảnh hệ thống và phần đối chiếu với đề cương đồ án.
+Nhằm giúp người đọc dễ theo dõi nội dung, đồ án được trình bày theo trình tự từ cơ sở lý thuyết đến quá trình thiết kế và triển khai thực tế. Trình tự đọc đề xuất như sau:
+Mở đầu → Tóm tắt → Chương 1 → Chương 2 → Chương 3 → Kết luận và hướng phát triển
+Trong đó:
+Chương 1 tập trung trình bày cơ sở lý thuyết và công nghệ nền tảng phục vụ xây dựng hệ thống.
+Chương 2 trình bày chi tiết kiến trúc và thiết kế của hệ thống vườn thông minh.
+Chương 3 tập trung vào quá trình hiện thực, triển khai và kiểm thử hệ thống thực tế.
+Thông qua cấu trúc trên, đồ án hướng đến việc trình bày nội dung một cách logic, rõ ràng và dễ theo dõi, đồng thời đảm bảo tính liên kết giữa phần lý thuyết và phần triển khai thực tế của hệ thống.
+CHƯƠNG 1
+TỔNG QUAN HỆ THỐNG VƯỜN THÔNG MINH
+Chương này trình bày tổng quan về bài toán vườn thông minh, bối cảnh phát triển của nông nghiệp thông minh và các vấn đề thực tế đặt ra trong quá trình chăm sóc cây trồng. Đồng thời, chương cũng giới thiệu các công nghệ nền tảng được sử dụng trong đồ án như Internet of Things (IoT), MQTT, Firebase, ESP32 và các cảm biến môi trường. Đây là cơ sở lý thuyết và nền tảng công nghệ phục vụ cho việc thiết kế và triển khai hệ thống ở các chương tiếp theo.
+1.1. Nông nghiệp thông minh, lý do chọn đề tài, mục tiêu và phạm vi
+1.1.1. Bối cảnh và vấn đề
+Trong những năm gần đây, cùng với quá trình đô thị hóa và sự phát triển mạnh mẽ của khoa học công nghệ, mô hình nông nghiệp đô thị và vườn gia đình ngày càng được nhiều người quan tâm.
+Hình 1.1. Mô hình vườn thông minh trong môi trường đô thị
+Việc trồng cây tại nhà, trên ban công hoặc trong các khu vườn nhỏ không chỉ giúp cải thiện môi trường sống mà còn đáp ứng nhu cầu thực phẩm sạch, tạo không gian xanh và góp phần nâng cao chất lượng cuộc sống trong môi trường đô thị hiện đại.
+Bên cạnh nhu cầu về thực phẩm an toàn, nhiều gia đình hiện nay còn xem việc chăm sóc cây cảnh và cây trồng như một hình thức thư giãn sau thời gian học tập và làm việc. Các mô hình như vườn rau mini, vườn ban công hay khu vườn thông minh trong nhà đang dần trở nên phổ biến tại các thành phố lớn. Tuy nhiên, diện tích trồng cây trong đô thị thường nhỏ, môi trường thay đổi thất thường và người dùng không có nhiều thời gian để chăm sóc thường xuyên. Điều này đặt ra yêu cầu cần có các giải pháp hỗ trợ theo dõi và quản lý cây trồng hiệu quả hơn.
+Trong thực tế, quá trình chăm sóc cây hiện nay phần lớn vẫn được thực hiện thủ công và phụ thuộc nhiều vào kinh nghiệm của người trồng.
+Hình 1.2. Phương pháp chăm sóc cây thủ công truyền thống
+Các hoạt động như kiểm tra độ ẩm đất, tưới nước, theo dõi nhiệt độ hoặc đánh giá điều kiện ánh sáng thường được thực hiện bằng cảm quan hoặc theo thói quen. Phương pháp này có ưu điểm là đơn giản nhưng lại thiếu tính chính xác và khó đảm bảo ổn định trong thời gian dài.
+Ngoài ra, mỗi loại cây trồng sẽ có nhu cầu về môi trường sinh trưởng khác nhau. Một số loại cây cần độ ẩm đất cao, trong khi các loại cây khác lại yêu cầu môi trường khô ráo hơn. Nếu không kiểm soát tốt các thông số môi trường, cây có thể gặp tình trạng thiếu nước, úng nước hoặc sinh trưởng kém do nhiệt độ và ánh sáng không phù hợp. Việc tưới nước không đúng thời điểm không chỉ gây ảnh hưởng đến cây trồng mà còn làm lãng phí tài nguyên nước và tăng công sức chăm sóc.
+Bên cạnh đó, việc theo dõi trạng thái khu vườn còn gặp nhiều hạn chế khi người dùng không có mặt trực tiếp tại nơi trồng cây. Trong nhiều trường hợp, người dùng khó kiểm tra điều kiện môi trường theo thời gian thực hoặc điều khiển thiết bị từ xa khi cần thiết. Đối với những người thường xuyên đi làm, đi công tác hoặc không có nhiều thời gian chăm sóc cây, việc duy trì tình trạng ổn định cho khu vườn là một vấn đề tương đối khó khăn.
+Song song với sự phát triển của công nghệ số, Internet of Things (IoT) đang được ứng dụng mạnh mẽ trong nhiều lĩnh vực như nhà thông minh, công nghiệp, y tế và nông nghiệp. IoT cho phép các thiết bị vật lý có khả năng kết nối Internet, thu thập dữ liệu từ môi trường và trao đổi dữ liệu với nhau một cách tự động. Trong lĩnh vực nông nghiệp, IoT mở ra khả năng xây dựng các hệ thống giám sát và điều khiển thông minh với chi phí ngày càng thấp nhưng vẫn đảm bảo hiệu quả cao.
+Các vi điều khiển tích hợp Wi-Fi như ESP32 hiện nay có giá thành phù hợp, dễ lập trình và hỗ trợ nhiều giao thức truyền thông hiện đại như MQTT, HTTP hoặc WebSocket. Khi kết hợp với các cảm biến môi trường như cảm biến nhiệt độ, độ ẩm đất, ánh sáng và mực nước, hệ thống có thể liên tục thu thập dữ liệu và truyền về cloud để xử lý. Người dùng từ đó có thể theo dõi khu vườn theo thời gian thực thông qua điện thoại, máy tính bảng hoặc trình duyệt web.
+Ngoài chức năng giám sát, hệ thống còn có thể hỗ trợ điều khiển thiết bị từ xa như bật/tắt bơm nước, thiết lập ngưỡng cảnh báo hoặc kích hoạt chế độ tưới tự động. Dữ liệu môi trường được lưu trữ liên tục trên cloud còn giúp người dùng theo dõi lịch sử hoạt động của khu vườn, đánh giá xu hướng thay đổi môi trường và đưa ra phương án chăm sóc phù hợp hơn.
+Từ những yêu cầu thực tế trên, việc nghiên cứu và xây dựng hệ thống vườn thông minh ứng dụng công nghệ IoT là cần thiết và có ý nghĩa thực tiễn cao. Hệ thống không chỉ hỗ trợ tự động hóa quá trình chăm sóc cây mà còn tạo nền tảng để phát triển các ứng dụng nông nghiệp thông minh trong tương lai.
+[Hình 1.3. Mô hình ứng dụng IoT trong nông nghiệp thông minh]
+1.1.2. Vấn đề cần giải quyết
+Từ thực tế trên, đồ án tập trung giải quyết các vấn đề chính sau:
+Không có giao diện tập trung để theo dõi trạng thái khu vườn theo thời gian thực.
+Dữ liệu cảm biến chưa được lưu trữ và tra cứu thuận tiện theo ngày hoặc theo khoảng thời gian.
+Thiếu cơ chế cảnh báo khi môi trường vượt quá ngưỡng phù hợp của từng loại cây trồng.
+Chức năng điều khiển bơm tưới chưa được tích hợp đồng bộ với hệ thống giám sát.
+Người dùng gặp khó khăn trong việc quản lý và điều khiển hệ thống từ xa trên nhiều thiết bị khác nhau.
+[Hình 1.4. Các vấn đề tồn tại trong phương pháp chăm sóc truyền thống]
+Để giải quyết các vấn đề trên, cần xây dựng một hệ thống có khả năng kết nối thiết bị IoT, đồng bộ dữ liệu thời gian thực và hỗ trợ điều khiển từ xa thông qua Internet.
+1.1.3. Ý nghĩa thực tiễn
+Đề tài mang nhiều ý nghĩa thực tiễn trong việc ứng dụng công nghệ IoT vào lĩnh vực nông nghiệp thông minh và đời sống hằng ngày.
+Thứ nhất, hệ thống giúp tối ưu hóa lượng nước tưới thông qua việc theo dõi độ ẩm đất và tự động kích hoạt bơm khi cần thiết. Điều này góp phần tiết kiệm nước và hạn chế tình trạng tưới dư thừa.
+Thứ hai, hệ thống hỗ trợ giảm công sức chăm sóc thủ công nhờ khả năng giám sát và điều khiển từ xa. Người dùng có thể theo dõi trạng thái khu vườn mọi lúc, mọi nơi thông qua điện thoại hoặc máy tính.
+Ngoài ra, đề tài còn tạo nền tảng để phát triển các chức năng nâng cao trong tương lai như:
+Chế độ AUTO thông minh.
+Phân tích dữ liệu môi trường.
+Ứng dụng machine learning để dự đoán nhu cầu tưới nước.
+Mở rộng hệ thống cho nhiều khu vườn hoặc quy mô lớn hơn.
+1.1.4. Mục tiêu chính
+Mục tiêu chính của đồ án là xây dựng hệ thống phần mềm giám sát và điều khiển vườn thông minh dựa trên nền tảng Internet of Things (IoT). Hệ thống có khả năng kết nối với ESP32 thông qua giao thức MQTT, thu thập dữ liệu cảm biến theo thời gian thực, lưu trữ dữ liệu trên cloud và hỗ trợ điều khiển thiết bị từ xa trên nhiều nền tảng khác nhau.
+1.1.5. Mục tiêu cụ thể
+Để đạt được mục tiêu tổng quát, đồ án triển khai các mục tiêu cụ thể như sau:
+Bảng 1.1. Danh sách mục tiêu cụ thể và trạng thái hoàn thành
+STT
+Mục tiêu
+Trạng thái
+1
+ESP32 publish dữ liệu cảm biến lên topic esp32/sensor
+Đã thiết kế giao thức
+2
+Xây dựng Web dashboard realtime, biểu đồ và lịch sử dữ liệu
+Hoàn thành
+3
+Xây dựng ứng dụng Mobile (Expo) giám sát và điều khiển qua MQTT
+Hoàn thành
+4
+Xây dựng ứng dụng Desktop bằng Electron
+Hoàn thành
+5
+Xây dựng Server bridge MQTT → Firebase
+Hoàn thành (tùy chọn)
+6
+Xây dựng chức năng đăng nhập và phân quyền admin/viewer
+Hoàn thành
+7
+Xây dựng cấu hình mẫu và ngưỡng theo loại cây trồng
+Hoàn thành
+1.1.6. Phạm vi đồ án
+Phạm vi nghiên cứu của đồ án được xác định dựa trên nội dung đã đăng ký trong đề cương đồ án tốt nghiệp ngày 10/02/2025.
+1.1.6.1. Nội dung trong phạm vi nghiên cứu
+Đồ án tập trung nghiên cứu và xây dựng các nội dung sau:
+Hệ thống vườn thông minh phục vụ mô hình quy mô nhỏ hoặc hộ gia đình.
+Chức năng giám sát các thông số môi trường như:
+Nhiệt độ.
+Độ ẩm không khí.
+Độ ẩm đất.
+Cường độ ánh sáng.
+Mực nước.
+Chức năng điều khiển bơm nước từ xa và chế độ AUTO.
+Hệ thống lưu trữ dữ liệu trên Firebase Realtime Database.
+Dashboard đa nền tảng gồm:
+Web (React).
+Mobile (Expo React Native).
+Desktop (Electron).
+Hệ thống trung gian Node.js kết nối MQTT và Firebase.
+Mô hình phần cứng tham chiếu sử dụng ESP32 và các cảm biến môi trường.
+1.1.6.2. Nội dung ngoài phạm vi nghiên cứu
+Các nội dung sau không nằm trong phạm vi giải quyết của đồ án:
+Hệ thống nông nghiệp quy mô lớn hoặc nông trại công nghiệp.
+Phân tích và tối ưu bằng trí tuệ nhân tạo hoặc machine learning.
+Thiết kế chi tiết mạch in PCB.
+Xây dựng firmware ESP32 hoàn chỉnh trong repository chính của đồ án.
+Tối ưu hóa phần cứng cho mục đích thương mại hoặc sản xuất hàng loạt.
+1.1.7. Lý do chọn đề tài
+Chi tiết lý do chọn đề tài đã được trình bày trong phần Mở đầu của đồ án. Nhìn chung, đề tài được lựa chọn do có tính thực tiễn cao, phù hợp với xu hướng phát triển của Internet of Things (IoT) và cho phép áp dụng nhiều kiến thức đã học như lập trình Web/Mobile, MQTT, Firebase, hệ thống realtime và quản lý dữ liệu cloud.
+1.2. Tổng quan Internet of Things (IoT)
+1.2.1. Khái niệm và mô hình phân lớp
+Internet of Things (IoT) là mạng lưới các thiết bị vật lý được tích hợp cảm biến, phần mềm và khả năng kết nối Internet nhằm thu thập, trao đổi và xử lý dữ liệu một cách tự động.
+Trong hệ thống vườn thông minh, IoT đóng vai trò trung tâm giúp kết nối giữa phần cứng, cloud và ứng dụng người dùng. Dữ liệu môi trường được thu thập từ cảm biến, gửi lên MQTT Broker thông qua Wi-Fi và đồng bộ đến các nền tảng Web, Mobile và Desktop.
+Mô hình hoạt động của hệ thống được xây dựng theo kiến trúc phân lớp gồm:
+Tầng
+Thành phần trong đồ án
+Thiết bị (Device Layer)
+ESP32, cảm biến, relay, bơm
+Mạng (Network Layer)
+Wi-Fi, MQTT (HiveMQ Cloud)
+Ứng dụng (Application Layer)
+Dashboard React, Expo, Electron
+Dữ liệu (Data Layer)
+Firebase Realtime Database
+[Hình 1.5. Mô hình phân lớp IoT trong hệ thống]
+Trong lĩnh vực vườn thông minh và nông nghiệp đô thị, IoT cho phép xây dựng các hệ thống giám sát môi trường theo thời gian thực thông qua cảm biến và Internet. Người dùng có thể theo dõi nhiệt độ, độ ẩm đất, ánh sáng và điều khiển thiết bị tưới từ xa thông qua điện thoại hoặc trình duyệt web. Ngoài ra, dữ liệu được lưu trữ liên tục trên cloud còn hỗ trợ phân tích xu hướng môi trường và mở rộng sang các chức năng tự động hóa trong tương lai.
+1.2.2. Đặc điểm cơ bản của hệ thống IoT
+Hệ thống IoT trong đồ án có các đặc điểm chính như sau:
+a) Kết nối liên tục
+Thiết bị ESP32 liên tục gửi dữ liệu cảm biến lên MQTT Broker để đồng bộ với cloud và các ứng dụng client.
+b) Định danh thiết bị
+Mỗi thiết bị được gắn một mã định danh riêng (DEVICE_ID) nhằm hỗ trợ quản lý nhiều khu vườn khác nhau.
+Ví dụ: esp32_01
+c) Xử lý phân tán
+ESP32 thực hiện thu thập dữ liệu tại thiết bị, trong khi việc hiển thị, lưu trữ và xử lý được thực hiện trên server và cloud.
+d) Khả năng mở rộng
+Hệ thống có thể mở rộng thêm nhiều client Web/Mobile/Desktop mà không cần thay đổi firmware thiết bị.
+[Hình 1.6. Luồng dữ liệu thời gian thực trong hệ thống]
+1.3. MQTT và Firebase
+1.3.1. Giao thức MQTT
+MQTT (Message Queuing Telemetry Transport) là giao thức truyền thông theo mô hình publish/subscribe, được thiết kế dành cho các thiết bị nhúng và hệ thống IoT.
+Trong hệ thống:
+ESP32 publish dữ liệu cảm biến lên MQTT Broker.
+Các ứng dụng Web/Mobile/Desktop subscribe topic để nhận dữ liệu realtime.
+Hệ thống sử dụng HiveMQ Cloud làm MQTT Broker trung gian.
+[Hình 1.7. Mô hình publish/subscribe MQTT]
+MQTT có các ưu điểm nổi bật như:
+Giao thức nhẹ và tiết kiệm băng thông.
+Hoạt động tốt trên mạng không ổn định.
+Hỗ trợ realtime với độ trễ thấp.
+Phù hợp với thiết bị IoT công suất thấp.
+1.3.2. Firebase Realtime Database và Authentication
+Firebase Realtime Database được sử dụng để lưu trữ dữ liệu cảm biến và đồng bộ dữ liệu theo thời gian thực.
+Cấu trúc dữ liệu chính gồm:
+latest/
+history/{ngày}/
+config/
+presets/ (lưu các cấu hình mẫu theo loại cây trồng)
+users/ — hồ sơ người dùng
+roles/ — phân quyền admin / viewer
+Firebase Authentication được sử dụng để:
+Đăng nhập bằng email/password.
+Quản lý người dùng.
+Phân quyền admin và viewer.
+[Hình 1.8. Cấu trúc dữ liệu Firebase]
+1.3.3. Nền tảng phần mềm và công cụ
+Hệ thống sử dụng nhiều công nghệ hiện đại nhằm hỗ trợ realtime và đa nền tảng.
+Bảng 1.2. Công nghệ và thư viện sử dụng trong hệ thống
+Công nghệ
+Vai trò trong dự án
+React 19
+Xây dựng Web dashboard
+mqtt.js
+MQTT client trên Web
+Recharts
+Hiển thị biểu đồ realtime
+React Native (Expo)
+Ứng dụng Mobile
+Electron
+Ứng dụng Desktop
+firebase-admin
+Đồng bộ dữ liệu Firebase
+Node.js + Express
+Server bridge
+1.4. ESP32, cảm biến, relay và bơm nước
+Hệ thống phần cứng của đồ án được xây dựng dựa trên vi điều khiển ESP32 kết hợp với các cảm biến môi trường và module điều khiển thiết bị. Các thành phần phần cứng có nhiệm vụ thu thập dữ liệu môi trường, xử lý dữ liệu và điều khiển hệ thống tưới nước tự động thông qua kết nối Internet.
+Bảng 1.3. Thành phần phần cứng sử dụng trong hệ thống
+Thành phần
+Vai trò
+ESP32 CH340 30P WiFi + Bluetooth
+Vi điều khiển trung tâm, kết nối Wi-Fi và giao tiếp MQTT
+DHT11
+Đo nhiệt độ và độ ẩm không khí
+Module relay 5V
+Điều khiển máy bơm mini (tách mạch ESP32)
+HC-SR04
+Đo khoảng cách và mực nước
+Soil Moisture Sensor V1.2
+Đo độ ẩm đất
+Máy bơm mini
+Tưới nước cho cây
+Breadboard và dây nối
+Kết nối và thử nghiệm mạch
+Điện trở 1kΩ – 2kΩ
+Hạn dòng và ổn định tín hiệu
+Cảm biến ánh sáng (quang trở / LDR hoặc BH1750)
+Đo cường độ ánh sáng (lux), gửi qua ESP32
+1.4.1. Vi điều khiển ESP32 CH340 30P WiFi + Bluetooth
+ESP32 CH340 30P là vi điều khiển trung tâm được sử dụng trong hệ thống vườn thông minh. Đây là dòng vi điều khiển tích hợp sẵn Wi-Fi và Bluetooth, phù hợp cho các ứng dụng Internet of Things (IoT) nhờ khả năng xử lý ổn định, chi phí thấp và hỗ trợ nhiều giao thức truyền thông hiện đại.
+Trong hệ thống, ESP32 đảm nhận các chức năng chính như:
+Thu thập dữ liệu từ các cảm biến môi trường.
+Xử lý dữ liệu tại thiết bị.
+Gửi dữ liệu cảm biến lên MQTT Broker thông qua kết nối Wi-Fi.
+Nhận lệnh điều khiển từ dashboard Web/Mobile/Desktop.
+Điều khiển relay và máy bơm nước.
+ESP32 được lập trình bằng Arduino IDE và hỗ trợ nhiều chuẩn giao tiếp như GPIO, ADC, UART, SPI và I2C, giúp dễ dàng kết nối với các cảm biến và thiết bị ngoại vi.
+Một số thông số kỹ thuật chính:
+Vi điều khiển: ESP32 Dual-Core.
+Tần số hoạt động tối đa: 240MHz.
+Điện áp hoạt động: 3.3V.
+Tích hợp Wi-Fi 2.4GHz và Bluetooth.
+Hỗ trợ nhiều chân GPIO và ADC.
+Kết nối USB thông qua chip CH340.
+ESP32 được lựa chọn do có khả năng kết nối mạng mạnh mẽ, hoạt động ổn định và phù hợp với các hệ thống realtime sử dụng MQTT và cloud.
+[Hình 1.9. Vi điều khiển ESP32 CH340 30P WiFi + Bluetooth]
+DHT11 là cảm biến dùng để đo nhiệt độ và độ ẩm không khí trong môi trường.
+Cảm biến có kích thước nhỏ gọn, dễ sử dụng và phù hợp với các mô hình IoT cơ bản. Trong hệ thống, DHT11 được kết nối với ESP32 để thu thập dữ liệu môi trường theo thời gian thực.
+Dữ liệu từ DHT11 được gửi lên MQTT Broker và hiển thị trên dashboard Web/Mobile/Desktop nhằm hỗ trợ người dùng theo dõi điều kiện môi trường của khu vườn.
+Một số thông số chính:
+Điện áp hoạt động: 3V – 5V.
+Phạm vi đo nhiệt độ: 0°C – 50°C.
+Phạm vi đo độ ẩm: 20% – 90% RH.
+Giao tiếp Digital.
+Mặc dù độ chính xác không cao bằng các cảm biến cao cấp hơn, DHT11 vẫn phù hợp cho mô hình thử nghiệm và nghiên cứu trong đồ án.
+[Hình 1.10. Cảm biến DHT11]
+1.4.3. Cảm biến độ ẩm đất Soil Moisture Sensor V1.2
+Soil Moisture Sensor V1.2 được sử dụng để đo độ ẩm của đất thông qua nguyên lý dẫn điện giữa hai điện cực.
+Khi độ ẩm đất thay đổi, điện trở của môi trường đất cũng thay đổi theo, từ đó cảm biến xuất ra giá trị analog tương ứng với độ ẩm của đất. ESP32 sẽ đọc giá trị này thông qua chân ADC và xử lý thành phần trăm độ ẩm.
+Trong hệ thống, cảm biến độ ẩm đất đóng vai trò quan trọng trong việc:
+Giám sát tình trạng đất khô hoặc ẩm.
+Gửi cảnh báo khi đất thiếu nước.
+Kích hoạt chế độ tưới tự động khi độ ẩm xuống thấp hơn ngưỡng cấu hình.
+Một số thông số chính:
+Điện áp hoạt động: 3.3V – 5V.
+Hỗ trợ tín hiệu Analog và Digital.
+Độ nhạy có thể điều chỉnh.
+Việc sử dụng cảm biến độ ẩm đất giúp hệ thống tối ưu lượng nước tưới và hạn chế tình trạng cây thiếu nước hoặc úng nước.
+[Hình 1.11. Cảm biến độ ẩm đất Soil Moisture Sensor V1.2]
+1.4.4. Cảm biến siêu âm HC-SR04
+HC-SR04 là cảm biến siêu âm dùng để đo khoảng cách bằng cách phát và nhận sóng siêu âm.
+Trong đồ án, cảm biến HC-SR04 được sử dụng để xác định mực nước trong bồn chứa. ESP32 sẽ tính toán khoảng cách từ cảm biến đến mặt nước dựa trên thời gian phản hồi của sóng siêu âm.
+Nguyên lý hoạt động:
+Chân Trigger phát tín hiệu siêu âm.
+Chân Echo nhận tín hiệu phản hồi.
+ESP32 tính toán khoảng cách dựa trên thời gian truyền và nhận tín hiệu.
+Dữ liệu mực nước giúp hệ thống:
+Theo dõi lượng nước còn lại trong bồn chứa.
+Gửi cảnh báo khi mực nước xuống thấp.
+Hạn chế tình trạng máy bơm hoạt động khi không còn đủ nước.
+Một số thông số chính:
+Điện áp hoạt động: 5V.
+Khoảng cách đo: 2cm – 400cm.
+Góc quét: khoảng 15 độ.
+[Hình 1.12. Cảm biến siêu âm HC-SR04]
+1.4.5. Máy bơm mini
+Máy bơm mini có nhiệm vụ cung cấp nước cho cây trồng theo lệnh điều khiển từ hệ thống.
+Bơm có thể hoạt động theo hai chế độ:
+Điều khiển thủ công từ dashboard.
+Tự động bật/tắt theo ngưỡng độ ẩm đất.
+Trong đồ án, máy bơm được điều khiển thông qua relay nhằm đảm bảo an toàn cho ESP32 khi đóng/ngắt tải.
+[Hình 1.13. Máy bơm mini sử dụng trong hệ thống]
+1.4.6. Breadboard, dây nối và điện trở
+Breadboard và dây nối được sử dụng để xây dựng mô hình mạch thử nghiệm mà không cần hàn cố định. Điều này giúp thuận tiện trong quá trình kiểm tra, thay đổi và mở rộng hệ thống.
+Ngoài ra, các điện trở 1kΩ – 2kΩ được sử dụng nhằm:
+Hạn dòng điện.
+Ổn định tín hiệu cảm biến.
+Bảo vệ linh kiện trong quá trình hoạt động.
+[Hình 1.14. Breadboard, dây nối và điện trở]
+1.4.7. Sơ đồ kết nối phần cứng tổng thể
+Trong hệ thống, các cảm biến được kết nối trực tiếp với ESP32 để thu thập dữ liệu môi trường. ESP32 sau đó gửi dữ liệu lên MQTT Broker thông qua Wi-Fi và nhận lệnh điều khiển từ ứng dụng Web/Mobile/Desktop.
+Khi độ ẩm đất thấp hơn ngưỡng cấu hình, hệ thống có thể gửi cảnh báo hoặc tự động kích hoạt máy bơm để tưới cây.
+91440035179000
+[Hình 1.15. Sơ đồ khối kết nối phần cứng của hệ thống]
+KẾT CHƯƠNG
+Chương 1 đã trình bày tổng quan về bài toán vườn thông minh, bối cảnh ứng dụng Internet of Things trong nông nghiệp đô thị cũng như các vấn đề thực tế cần giải quyết. Đồng thời, chương cũng giới thiệu các công nghệ và thành phần chính được sử dụng trong hệ thống như MQTT, Firebase, ESP32 và các cảm biến môi trường. Đây là cơ sở lý thuyết và nền tảng công nghệ phục vụ cho quá trình thiết kế, xây dựng và triển khai hệ thống được trình bày trong các chương tiếp theo.
+CHƯƠNG 2: PHÂN TÍCH YÊU CẦU VÀ THIẾT KẾ HỆ THỐNG
+Chương 1 đã trình bày tổng quan về bài toán vườn thông minh, cơ sở lý thuyết Internet of Things (IoT), giao thức MQTT, Firebase và các thành phần phần cứng tham chiếu được sử dụng trong hệ thống.Tiếp nối nội dung đó, Chương 2 tập trung phân tích yêu cầu và thiết kế hệ thống phần mềm cho mô hình vườn thông minh. Nội dung chương bao gồm phân tích yêu cầu chức năng và phi chức năng, thiết kế kiến trúc hệ thống, giao tiếp MQTT, cấu trúc dữ liệu Firebase, luồng xử lý nghiệp vụ, tổ chức mã nguồn và thiết kế giao diện người dùng.
+Các sơ đồ kỹ thuật trong chương được biểu diễn bằng PlantUML hoặc Mermaid nhằm mô tả kiến trúc và luồng xử lý của hệ thống. Các giao diện minh họa sử dụng wireframe hoặc mô hình màn hình ở mức thiết kế; ảnh chụp ứng dụng thực tế được trình bày tại Chương 3.
+Bảng 2.1. Đối tượng sử dụng và quyền hạn
+Vai trò
+Quyền hạn chính
+Admin
+Xem dữ liệu realtime, cấu hình ngưỡng, điều khiển bơm, bật/tắt AUTO, quản lý người dùng
+Viewer
+Chỉ xem dữ liệu, biểu đồ và trạng thái vườn
+Người vận hành
+Theo dõi khu vườn từ xa thông qua Web/Mobile/Desktop
+Phạm vi phần mềm trong chương này bao gồm:
+Ứng dụng Web sử dụng React.
+Ứng dụng Mobile sử dụng Expo React Native.
+Ứng dụng Desktop sử dụng Electron.
+Hệ thống trung gian Node.js bridge MQTT → Firebase (tùy chọn).
+Thiết kế giao thức MQTT và cấu trúc Firebase.
+Firmware ESP32 và lắp ráp phần cứng chỉ được mô tả tham chiếu, không thuộc phạm vi thiết kế chi tiết của chương này.
+[Hình 2.1a — Use case người dùng]
+[Hình 2.1b - Use case thiết bị và đồng bộ dữ liệu]
+2.1.2. Yêu cầu chức năng
+Từ các vấn đề thực tế đã phân tích trong Chương 1, hệ thống được xây dựng nhằm đáp ứng các yêu cầu chức năng sau.
+Bảng 2.2. Ma trận yêu cầu chức năng
+STT
+Yêu cầu
+Mô tả
+Thành phần đáp ứng
+F1
+Giám sát realtime
+Hiển thị nhiệt độ, độ ẩm không khí, độ ẩm đất, ánh sáng, mực nước
+Dashboard Web/Mobile
+F2
+Lưu lịch sử dữ liệu
+Lưu và tra cứu dữ liệu theo ngày
+Firebase Realtime Database
+F3
+Cảnh báo môi trường
+Cảnh báo khi vượt ngưỡng
+Logic xử lý và banner UI
+F4
+Đánh giá trạng thái vườn
+Hiển thị trạng thái tổng thể của vườn
+garden_status
+F5
+Điều khiển bơm
+Bật/tắt bơm từ xa
+MQTT
+F6
+Chế độ AUTO
+Tưới tự động theo ngưỡng độ ẩm đất
+MQTT + firmware
+F7
+Cấu hình ngưỡng
+Lưu và đồng bộ cấu hình
+Firebase + MQTT
+F8
+Cấu hình mẫu cây trồng
+Chọn preset theo loại cây
+ConfigPage
+F9
+Xác thực người dùng
+Đăng nhập/đăng ký
+Firebase Authentication
+F10
+Phân quyền
+Admin / Viewer
+Firebase role
+F11
+Đa nền tảng
+Web, Mobile, Desktop
+React, Expo, Electron
+F12
+Đồng bộ cloud
+MQTT → Firebase
+Node.js bridge
+2.1.3. Yêu cầu phi chức năng
+Ngoài các chức năng chính, hệ thống còn cần đáp ứng các yêu cầu phi chức năng nhằm đảm bảo tính ổn định, khả năng mở rộng và trải nghiệm người dùng.
+Bảng 2.3. Yêu cầu phi chức năng
+Yêu cầu
+Tiêu chí
+Cách đáp ứng
+Realtime
+Cập nhật nhanh
+MQTT publish/subscribe
+Khả năng kết nối
+Tự reconnect
+reconnectPeriod
+Khả năng mở rộng
+Thêm client dễ dàng
+MQTT broker trung gian
+Đa nền tảng
+Web/Mobile/Desktop
+Kiến trúc tách service
+Giao diện
+Responsive, dark theme
+React component
+Bảo mật
+Phân quyền người dùng
+Firebase Auth
+Bảo trì
+Code tổ chức rõ ràng
+shared/services, components
+2.1.4. Quy tắc cảnh báo và trạng thái vườn
+Hệ thống sử dụng các ngưỡng môi trường để đánh giá tình trạng hoạt động của khu vườn và sinh cảnh báo khi điều kiện môi trường không phù hợp.
+Bảng 2.4. Điều kiện cảnh báo môi trường
+Điều kiện
+Thông báo
+do_am_dat < minSoil
+Đất đang khô, cần tưới
+nhiet_do > maxTemp
+Nhiệt độ quá cao
+do_am_khong_khi < minAirHum
+Không khí khô
+anh_sang > maxLux
+Ánh sáng mạnh
+muc_nuoc > maxWaterDistance
+Mực nước thấp
+Từ các cảnh báo trên, hệ thống tổng hợp và đánh giá trạng thái chung của khu vườn.
+Bảng 2.5. Mã trạng thái vườn
+Mã trạng thái
+Ý nghĩa
+TOT
+Tốt
+CAN_CHU_Y
+Cần chú ý
+NGUY_HIEM
+Nguy hiểm
+CHUA_CAU_HINH
+Chưa cấu hình
+[CHÈN HÌNH 2.2 — State Diagram trạng thái vườn]
+2.2. Thiết kế kiến trúc phần mềm
+2.2.1. Kiến trúc tổng thể hệ thống
+Hệ thống được thiết kế theo mô hình client–server kết hợp giao thức MQTT và nền tảng cloud Firebase nhằm hỗ trợ giám sát realtime và đồng bộ dữ liệu đa nền tảng.
+Trong hệ thống, ESP32 đóng vai trò thiết bị IoT trung tâm, có nhiệm vụ thu thập dữ liệu từ các cảm biến môi trường như nhiệt độ, độ ẩm đất, độ ẩm không khí, ánh sáng và mực nước. Sau khi xử lý, dữ liệu được gửi lên MQTT Broker thông qua kết nối Wi-Fi.
+Các ứng dụng Web, Mobile và Desktop sẽ subscribe dữ liệu từ MQTT Broker để cập nhật trạng thái khu vườn theo thời gian thực. Khi người dùng thực hiện thao tác điều khiển như bật/tắt bơm hoặc kích hoạt chế độ AUTO, ứng dụng sẽ publish lệnh điều khiển lên MQTT Broker để ESP32 nhận và thực thi.
+Firebase Realtime Database được sử dụng để lưu trữ dữ liệu lịch sử, cấu hình hệ thống và thông tin người dùng. Hệ thống lưu các dữ liệu như:
+Dữ liệu cảm biến mới nhất (latest/).
+Lịch sử theo ngày (history/{YYYY-MM-DD}).
+Cấu hình ngưỡng (config/).
+Cấu hình mẫu theo loại cây (presets/).
+Ngoài ra, Firebase Authentication hỗ trợ đăng nhập và phân quyền người dùng theo hai vai trò chính:
+Admin: có quyền điều khiển và thay đổi cấu hình.
+Viewer: chỉ được phép theo dõi dữ liệu.
+Server Node.js là thành phần tùy chọn nhằm hỗ trợ ghi dữ liệu tập trung từ MQTT lên Firebase. Khi sử dụng server bridge, dữ liệu lịch sử vẫn được lưu đầy đủ ngay cả khi không có ứng dụng client đang hoạt động. Trong trường hợp không triển khai server, hệ thống vẫn có thể hoạt động realtime thông qua MQTT và Firebase.
+Kiến trúc này giúp hệ thống dễ mở rộng, cho phép bổ sung thêm nhiều thiết bị ESP32, nhiều client hoặc các chức năng nâng cao trong tương lai mà không cần thay đổi lớn trong cấu trúc hiện tại.
+[HÌNH 2.2 — Sơ đồ kiến trúc phần mềm tổng thể]
+2.2.2. Vai trò các thành phần phần mềm
+Bảng 2.6. Vai trò các thành phần trong hệ thống
+Thành phần
+Công nghệ
+Vai trò
+Web App
+React 19
+Dashboard và cấu hình
+Mobile App
+Expo React Native
+Giám sát trên điện thoại
+Desktop App
+Electron
+Ứng dụng desktop
+MQTT Service
+mqtt.js
+Publish/Subscribe MQTT
+Firebase Service
+Firebase SDK
+Auth và Realtime Database
+Server Bridge
+Node.js + Express
+MQTT → Firebase
+Firmware ESP32
+Arduino IDE
+Thu thập dữ liệu cảm biến
+2.3. Thiết kế giao tiếp MQTT
+2.3.1. Cấu hình kết nối MQTT Broker
+Hệ thống sử dụng HiveMQ Cloud làm MQTT Broker trung gian nhằm hỗ trợ kết nối realtime giữa ESP32 và các ứng dụng client.
+Bảng 2.7. Cấu hình MQTT
+Thành phần
+Giao thức
+Web
+WebSocket (wss)
+Mobile
+MQTT over TCP/TLS
+Server
+MQTT TLS
+ESP32
+MQTT TCP
+2.3.2. Topic và payload MQTT
+Hệ thống sử dụng ba topic chính để trao đổi dữ liệu và điều khiển.
+Bảng 2.8. Các topic MQTT trong hệ thống
+Topic
+Chức năng
+esp32/sensor
+Dữ liệu cảm biến
+esp32/control
+Điều khiển bơm và AUTO
+esp32/config
+Đồng bộ cấu hình
+Bảng 2.9. Lệnh điều khiển MQTT
+Lệnh
+Chức năng
+bat_bom
+Bật bơm
+tat_bom
+Tắt bơm
+auto_on
+Bật AUTO
+auto_off
+Tắt AUTO
+Bảng 2.10. Tham số cấu hình môi trường
+Tham số
+Ý nghĩa
+minSoil
+Độ ẩm đất tối thiểu
+targetSoil
+Độ ẩm đất mục tiêu
+maxTemp
+Nhiệt độ tối đa
+minAirHum
+Độ ẩm không khí tối thiểu
+maxLux
+Ánh sáng tối đa
+maxWaterDistance
+Khoảng cách mực nước tối đa
+Payload mẫu esp32/sensor
+{  "nhiet_do": 28.5,  "do_am_khong_khi": 65,  "do_am_dat": 42,  "anh_sang": 1200,  "muc_nuoc": 15,  "auto": true,  "pump": false,  "config": true,  "garden_status": "TOT"}
+Bảng 2.11. Alias dữ liệu cảm biến
+Alias
+Trường chuẩn
+temp
+nhiet_do
+humi
+do_am_khong_khi
+soil
+do_am_dat
+lux
+anh_sang
+distance
+muc_nuoc
+2.3.3. Module MQTT Service
+Module mqttService.js chịu trách nhiệm:
+Kết nối MQTT Broker.
+Subscribe topic dữ liệu cảm biến.
+Publish lệnh điều khiển.
+Publish cấu hình môi trường.
+Chuẩn hóa payload dữ liệu cảm biến.
+Các hàm chính:
+connect()
+publishControl()
+publishConfig()
+subscribeSensor()
+2.4. Thiết kế cơ sở dữ liệu Firebase và phân quyền
+2.4.1. Cấu trúc Firebase Realtime Database
+Firebase Realtime Database được sử dụng để lưu trữ dữ liệu cảm biến, cấu hình hệ thống và thông tin người dùng.
+devices/  esp32_01/    latest/    history/    config/    presets/users/  {uid}/roles/  {uid}/
+[HÌNH 2.4 — Cây dữ liệu Firebase]
+2.4.2. Xác thực và phân quyền
+Hệ thống sử dụng Firebase Authentication để quản lý đăng nhập bằng email và mật khẩu.
+Sau khi đăng nhập thành công:
+Firebase trả về uid.
+Ứng dụng đọc roles/{uid}.
+Hệ thống xác định quyền admin hoặc viewer.
+Giao diện được thay đổi theo quyền người dùng.
+Admin có quyền:
+Điều khiển bơm.
+Bật/tắt AUTO.
+Cấu hình hệ thống.
+Quản lý user.
+Viewer chỉ có quyền xem dữ liệu.
+[HÌNH 2.5 — Sequence Diagram phân quyền]
+2.4.3. Firebase Service
+Bảng 2.12. Các hàm Firebase Service
+Hàm
+Chức năng
+subscribeLatest()
+Lắng nghe dữ liệu realtime
+subscribeHistory()
+Lịch sử dữ liệu
+subscribeConfig()
+Đồng bộ cấu hình
+subscribeRole()
+Lấy quyền user
+saveConfig()
+Lưu cấu hình
+savePreset()
+Lưu preset
+signIn()
+Đăng nhập
+signOut()
+Đăng xuất
+2.5. Luồng dữ liệu và xử lý nghiệp vụ
+2.5.1. Luồng dữ liệu realtime
+Quá trình xử lý dữ liệu realtime diễn ra theo các bước:
+ESP32 đọc dữ liệu cảm biến.
+ESP32 publish dữ liệu lên topic esp32/sensor.
+MQTT Broker chuyển dữ liệu tới các client.
+Web/Mobile subscribe và cập nhật giao diện realtime.
+Server bridge (nếu có) ghi dữ liệu lên Firebase.
+[HÌNH 2.6 — Sequence Diagram luồng dữ liệu realtime]
+2.5.2. Luồng đăng nhập và phân quyền
+Người dùng nhập email và mật khẩu.
+Ứng dụng gửi yêu cầu xác thực tới Firebase Authentication.
+Firebase trả về uid.
+Hệ thống đọc roles/{uid}.
+Giao diện hiển thị theo quyền user.
+[CHÈN HÌNH 2.7 — Sequence Diagram đăng nhập]
+2.5.3. Luồng cảnh báo và điều khiển bơm
+Hệ thống nhận payload cảm biến.
+So sánh dữ liệu với cấu hình ngưỡng.
+Sinh danh sách cảnh báo (alerts).
+Xác định trạng thái vườn (garden_status).
+Hiển thị banner cảnh báo.
+Admin có thể bật/tắt bơm hoặc AUTO.
+[HÌNH 2.8 — Activity Diagram cảnh báo và điều khiển bơm]
+2.5.4. Luồng cấu hình mẫu cây trồng
+Người dùng chọn loại cây.
+Hệ thống nạp cấu hình mẫu.
+Người dùng chỉnh sửa nếu cần.
+Cấu hình được lưu lên Firebase.
+Hệ thống publish cấu hình xuống ESP32.
+[HÌNH 2.9 — Activity Diagram preset cây trồng]
+2.6. Thiết kế cấu trúc mã nguồn và giao diện
+2.6.1. Cấu trúc thư mục dự án
+iot-dashboard/├── src/│   ├── App.js│   ├── pages/│   │   ├── LoginPage.jsx│   │   ├── RegisterPage.jsx│   │   └── AdminPage.jsx│   └── shared/│       ├── components/│       │   ├── DashboardPage.jsx│       │   ├── SensorCard.jsx│       │   ├── SensorChart.jsx│       │   ├── ControlButtons.jsx│       │   └── ConfigPage.jsx│       ├── services/│       │   ├── mqttService.js│       │   └── firebaseService.js│       └── utils/│           └── sensorHistory.js├── mobile/├── desktop/├── server/└── public/
+2.6.2. Thiết kế giao diện người dùng
+Hệ thống được thiết kế theo phong cách dashboard hiện đại với giao diện dark theme nhằm hỗ trợ hiển thị dữ liệu realtime rõ ràng và trực quan.
+Bảng 2.13. Các thành phần giao diện
+Component
+Chức năng
+SensorCard
+Hiển thị thông số cảm biến
+SensorChart
+Biểu đồ realtime
+ControlButtons
+Điều khiển bơm và AUTO
+DashboardPage
+Dashboard tổng thể
+ConfigPage
+Cấu hình môi trường
+AdminPage
+Quản lý user
+Bảng 2.14. Route ứng dụng Web
+Route
+Chức năng
+/
+Dashboard
+/dang-nhap
+Đăng nhập
+/dang-ky
+Đăng ký
+/admin
+Quản trị
+Bảng 2.15. Cấu hình mẫu cây trồng
+Loại cây
+minSoil
+targetSoil
+maxTemp
+minAirHum
+Rau
+45
+70
+32
+55
+Xương rồng
+15
+30
+38
+35
+Lan
+40
+60
+30
+60
+Cây cảnh
+35
+55
+34
+50
+KẾT CHƯƠNG
+Chương 2 đã trình bày quá trình phân tích yêu cầu và thiết kế hệ thống phần mềm cho mô hình vườn thông minh. Nội dung chương bao gồm thiết kế kiến trúc hệ thống, giao tiếp MQTT, cấu trúc dữ liệu Firebase, luồng xử lý nghiệp vụ, tổ chức mã nguồn và thiết kế giao diện người dùng. Đây là cơ sở để triển khai hiện thực hệ thống, kiểm thử và đánh giá kết quả trong Chương 3 tiếp theo.
+CHƯƠNG 3: XÂY DỰNG VÀ TRIỂN KHAI
+Sau khi đã phân tích yêu cầu và thiết kế hệ thống tại Chương 2, chương này trình bày quá trình xây dựng và triển khai thực tế hệ thống Vườn Thông Minh. Nội dung bao gồm mô hình phần cứng, firmware ESP32, server bridge Node.js, ứng dụng Web/Mobile/Desktop và kết quả kiểm thử hệ thống.
+Chương tập trung vào phần hiện thực và kết quả triển khai thực tế, không lặp lại các khái niệm lý thuyết MQTT, Firebase hay IoT đã trình bày ở Chương 1.
+3.1. Phần cứng và mô hình thực nghiệm
+3.1.1. Thành phần phần cứng
+Hệ thống phần cứng được xây dựng dựa trên vi điều khiển ESP32 kết hợp với các cảm biến môi trường và module relay điều khiển bơm nước.
+Bảng 3.1. Thành phần phần cứng sử dụng trong hệ thống
+Thành phần
+Ghi chú
+ESP32 CH340 30P WiFi + Bluetooth
+Vi điều khiển trung tâm, kết nối Wi-Fi và MQTT
+DHT11
+Đo nhiệt độ và độ ẩm không khí
+Soil Moisture Sensor V1.2
+Đo độ ẩm đất
+HC-SR04
+Đo mực nước bồn chứa
+BH1750 (tùy chọn)
+Đo cường độ ánh sáng
+Relay 5V
+Điều khiển bơm nước
+Máy bơm mini
+Tưới nước cho cây
+Breadboard + dây nối
+Lắp ráp mô hình thử nghiệm
+Điện trở 1kΩ – 2kΩ
+Hạn dòng, ổn định tín hiệu
+Công tắc cơ (tùy chọn)
+Điều khiển thủ công
+ESP32 đóng vai trò thiết bị IoT trung tâm, chịu trách nhiệm đọc dữ liệu từ cảm biến, xử lý dữ liệu và giao tiếp với MQTT Broker thông qua Wi-Fi. Các cảm biến môi trường được kết nối trực tiếp với ESP32 để đo nhiệt độ, độ ẩm không khí, độ ẩm đất và mực nước.
+Dữ liệu cảm biến sau khi xử lý sẽ được publish lên MQTT Broker theo chu kỳ định sẵn. Đồng thời ESP32 subscribe các topic điều khiển để nhận lệnh bật/tắt bơm hoặc cập nhật cấu hình từ dashboard.
+Relay 5V được sử dụng để đóng/ngắt nguồn cho máy bơm mini. Khi độ ẩm đất xuống thấp hơn ngưỡng cấu hình, hệ thống có thể tự động kích hoạt relay để bật bơm trong chế độ AUTO.
+Breadboard và dây nối được sử dụng nhằm hỗ trợ quá trình thử nghiệm, thay đổi sơ đồ kết nối và mở rộng mô hình dễ dàng mà không cần thiết kế PCB riêng.
+[HÌNH 3.1 -Sơ đồ khối: ESP32 nối DHT11, HC-SR04, Soil Moisture Sensor, relay và máy bơm]
+[HÌNH 3.2 — Ảnh thực tế breadboard, ESP32, cảm biến và bơm mini]
+3.2. Firmware ESP32 (Arduino IDE)
+Firmware nhúng được phát triển bằng Arduino IDE cho board ESP32. Chương trình thực hiện các chức năng chính gồm:
+Kết nối Wi-Fi.
+Kết nối MQTT Broker HiveMQ Cloud.
+Đọc dữ liệu cảm biến.
+Điều khiển relay và bơm nước.
+Nhận cấu hình từ dashboard.
+Publish dữ liệu realtime lên MQTT.
+Firmware được xây dựng theo mô hình vòng lặp liên tục (loop()), cho phép hệ thống hoạt động realtime và tự động reconnect khi mất kết nối mạng.
+Thông tin username/password MQTT trong mã nguồn được thay bằng placeholder nhằm đảm bảo an toàn khi công khai repository.
+3.2.1. Thư viện và công cụ sử dụng
+Bảng 3.2. Thư viện Arduino sử dụng trong firmware
+Thư viện
+Vai trò
+WiFi.h
+Kết nối Wi-Fi
+WiFiClientSecure
+MQTT TLS
+PubSubClient
+MQTT client
+DHT sensor library
+Đọc cảm biến DHT11
+BH1750
+Đọc cường độ ánh sáng
+ArduinoJson
+Tạo và parse JSON
+WiFiManager
+Cấu hình Wi-Fi lần đầu
+Preferences
+Lưu cấu hình vào NVS
+Hệ thống sử dụng giao thức MQTT qua TLS với cổng 8883 nhằm tăng độ an toàn trong quá trình truyền dữ liệu.
+WiFiManager cho phép người dùng cấu hình Wi-Fi lần đầu thông qua Access Point mà không cần sửa mã nguồn firmware.
+3.2.2. Sơ đồ ghim GPIO
+Bảng 3.3. Kết nối GPIO của ESP32
+GPIO
+Thiết bị
+GPIO 4
+DHT11
+GPIO 34
+Soil Moisture Sensor
+GPIO 27
+Relay bơm
+GPIO 14
+Công tắc cơ
+GPIO 5
+HC-SR04 Trigger
+GPIO 18
+HC-SR04 Echo
+GPIO 21
+BH1750 SDA
+GPIO 22
+BH1750 SCL
+Giá trị cảm biến độ ẩm đất được hiệu chuẩn theo môi trường thực tế:
+dry = 3500
+wet = 1500
+Sau đó map sang thang phần trăm từ 0–100%.
+3.2.3. Cấu trúc chương trình firmware
+Firmware được tổ chức thành nhiều hàm riêng nhằm dễ bảo trì và mở rộng.
+Bảng 3.4. Các khối chức năng chính của firmware
+Hàm / Module
+Chức năng
+setup()
+Khởi tạo Wi-Fi, MQTT, GPIO và cảm biến
+loop()
+Đọc sensor, xử lý MQTT và điều khiển bơm
+callback()
+Nhận lệnh MQTT
+publishSensorData()
+Publish dữ liệu cảm biến
+applyPumpLogic()
+Logic AUTO tưới cây
+updateGardenStatus()
+Tính trạng thái vườn
+saveConfig()
+Lưu cấu hình vào NVS
+Trong hàm loop(), hệ thống liên tục:
+Kiểm tra trạng thái kết nối MQTT.
+Đọc dữ liệu cảm biến.
+Tính toán trạng thái vườn.
+Xử lý chế độ AUTO.
+Publish dữ liệu lên broker.
+Chu kỳ gửi dữ liệu được cấu hình khoảng 3 giây/lần.
+Hình 3.3. Lưu đồ hoạt động firmware ESP32
+3.2.4. Giao tiếp MQTT trong firmware
+Firmware sử dụng nhiều topic MQTT để giao tiếp với dashboard.
+Bảng 3.5. Topic MQTT sử dụng trong firmware
+Topic
+Hướng
+Chức năng
+esp32/sensor
+Publish
+Gửi dữ liệu cảm biến
+esp32/control
+Subscribe
+Nhận lệnh điều khiển
+esp32/config
+Subscribe
+Nhận cấu hình ngưỡng
+esp32/status
+Publish
+Trạng thái online/offline
+esp32/alert
+Publish
+Gửi cảnh báo hệ thống
+Payload dữ liệu cảm biến được gửi dưới dạng JSON:
+{
+"nhiet_do": 28.5,
+"do_am_khong_khi": 65,
+"do_am_dat": 42,
+"anh_sang": 1200,
+"muc_nuoc": 15,
+"garden_status": "TOT",
+"auto_mode": "BAT",
+"trang_thai_bom": false
+}
+Ngoài các trường tiếng Việt, firmware còn hỗ trợ alias như temp, soil, humi nhằm tăng khả năng tương thích với nhiều client khác nhau.
+Ví dụ publish dữ liệu:
+doc["do_am_dat"] = soilPercent;
+doc["nhiet_do"] = temp;
+doc["garden_status"] = gardenStatus;
+client.publish("esp32/sensor", buffer);
+Ví dụ xử lý lệnh điều khiển:
+if (message == "bat_bom") {
+setPump(true);
+}
+else if (message == "tat_bom") {
+setPump(false);
+}
+3.2.5. Logic điều khiển bơm và an toàn hệ thống
+Hệ thống hỗ trợ hai chế độ hoạt động:
+Chế độ AUTO
+Khi độ ẩm đất nhỏ hơn minSoil, hệ thống tự động bật bơm.
+Khi độ ẩm đạt targetSoil, bơm sẽ tự động tắt.
+Chế độ thủ công
+Người dùng có thể bật/tắt bơm trực tiếp từ dashboard hoặc công tắc cơ.
+Cơ chế an toàn
+Để tránh hỏng bơm hoặc cạn nước, firmware bổ sung các điều kiện an toàn:
+Nếu muc_nuoc > maxWaterDistance → tắt bơm.
+Nếu bơm chạy liên tục quá 5 phút → tự động ngắt.
+Khi mất MQTT → hệ thống vẫn giữ trạng thái hoạt động hiện tại.
+Logic trạng thái vườn gồm:
+TOT
+CAN_CHU_Y
+NGUY_HIEM
+CHUA_CAU_HINH
+Trạng thái này đồng bộ với Web Dashboard nhằm đảm bảo hiển thị thống nhất.
+3.2.6. Kết quả chạy thử firmware
+Firmware được kiểm thử thông qua Serial Monitor ở tốc độ 115200 baud.
+Kết quả cho thấy:
+ESP32 reconnect MQTT ổn định.
+Dữ liệu cảm biến được publish đều đặn.
+Relay phản hồi đúng theo lệnh điều khiển.
+Chế độ AUTO hoạt động đúng logic.
+3.3. Server Node.js
+3.3.1. Vai trò server bridge
+Server Node.js được xây dựng nhằm hỗ trợ đồng bộ dữ liệu từ MQTT Broker lên Firebase Realtime Database.
+Server đóng vai trò trung gian:
+Subscribe dữ liệu MQTT.
+Ghi latest và history lên Firebase.
+Cung cấp API REST và Socket.IO.
+Tuy nhiên, server bridge là thành phần tùy chọn. Khi không chạy server, hệ thống vẫn hoạt động realtime thông qua MQTT và Firebase.
+3.3.2. Biến môi trường
+Bảng 3.6. Biến môi trường của server
+Biến
+Chức năng
+MQTT_URL
+Địa chỉ broker
+MQTT_USERNAME
+Username MQTT
+MQTT_PASSWORD
+Password MQTT
+FIREBASE_DB_URL
+URL Firebase
+DEVICE_ID
+Mã thiết bị
+PORT
+Port server
+3.3.3. Chạy server
+cd server
+npm install
+npm start
+Sau khi khởi động, server sẽ tự động connect MQTT và ghi dữ liệu sensor lên Firebase.
+3.4. Ứng dụng Web
+Ứng dụng Web được xây dựng bằng React 19 nhằm cung cấp dashboard realtime cho người dùng.
+Các chức năng chính:
+Hiển thị dữ liệu realtime.
+Biểu đồ lịch sử.
+Điều khiển bơm.
+Chế độ AUTO.
+Cấu hình ngưỡng.
+Quản lý preset cây trồng.
+Đăng nhập và phân quyền.
+3.4.1. Chạy ứng dụng Web
+cd iot-dashboard
+npm install
+npm start
+Ứng dụng chạy tại:
+http://localhost:3000
+Dashboard subscribe trực tiếp MQTT Broker để cập nhật trạng thái realtime với độ trễ thấp.
+3.5. Ứng dụng Mobile và Desktop
+3.5.1. Mobile (Expo)
+Ứng dụng Mobile được phát triển bằng React Native Expo.
+Phiên bản hiện tại tập trung vào:
+Giám sát dữ liệu MQTT realtime.
+Điều khiển bơm.
+Theo dõi trạng thái hệ thống.
+Phiên bản Mobile hiện chưa tích hợp đầy đủ Firebase Auth và phân quyền như Web Dashboard.
+cd mobile
+npm install
+npx expo start
+3.5.2. Desktop (Electron)
+Desktop App sử dụng Electron để đóng gói Web Dashboard thành ứng dụng desktop.
+npm run build
+cd desktop
+npm install
+npm start
+3.6. Kiểm thử, kết quả và đánh giá
+3.6.1. Kịch bản kiểm thử
+Bảng 3.7. Kịch bản kiểm thử hệ thống
+ID
+Kịch bản
+Kết quả mong đợi
+TC01
+Kết nối MQTT
+Dashboard hiển thị Connected
+TC02
+Publish sensor
+SensorCard cập nhật
+TC03
+Điều khiển bơm
+Relay hoạt động
+TC04
+AUTO mode
+Bơm tự bật/tắt
+TC05
+Firebase sync
+Có dữ liệu latest/history
+TC06
+Đăng nhập
+Auth thành công
+TC07
+Phân quyền
+Viewer không điều khiển
+TC08
+Reconnect MQTT
+Tự reconnect
+TC09
+Gửi config
+ESP32 nhận config
+TC10
+Cảnh báo
+Banner cảnh báo hiển thị
+Kết quả kiểm thử cho thấy hệ thống hoạt động ổn định trong môi trường mạng nội bộ và Internet.
+3.6.2. Kết quả thực nghiệm
+Bảng 3.8. Kết quả đo thử nghiệm
+Thời gian
+Nhiệt độ
+Độ ẩm đất
+MQTT
+09:00
+25.3°C
+40%
+OK
+09:05
+25.5°C
+39%
+OK
+09:10
+25.8°C
+38%
+OK
+Nguồn dữ liệu được ghi nhận từ Dashboard và MQTT Broker trong quá trình chạy thực nghiệm.
+3.6.3. Ảnh minh chứng phần mềm
+Hình 3.5. Dashboard Web
+Hình 3.6. Giao diện cấu hình cây trồng
+Hình 3.7. Trang quản trị Admin
+Hình 3.8. Firebase Realtime Database
+3.6.4. Đánh giá kết quả đạt được
+Sau quá trình xây dựng và triển khai, hệ thống đã hoàn thành các chức năng chính của một mô hình Vườn Thông Minh IoT đa nền tảng.
+Về phần cứng, ESP32 có khả năng đọc dữ liệu cảm biến ổn định, giao tiếp MQTT liên tục và điều khiển relay chính xác theo chế độ AUTO hoặc điều khiển thủ công. Hệ thống vẫn hoạt động ổn định khi reconnect Wi-Fi hoặc MQTT.
+Về phần mềm, dashboard Web cho khả năng giám sát realtime với giao diện trực quan, hỗ trợ biểu đồ lịch sử, cảnh báo môi trường và quản lý cấu hình cây trồng. Firebase giúp đồng bộ dữ liệu giữa nhiều client và lưu trữ lịch sử theo thời gian.
+Kiến trúc sử dụng MQTT Broker trung gian giúp hệ thống dễ mở rộng sang nhiều thiết bị hoặc nhiều dashboard khác nhau mà không cần thay đổi firmware ESP32.
+Ngoài ra, việc xây dựng thêm Mobile App và Desktop App cho thấy khả năng mở rộng đa nền tảng của hệ thống.
+3.6.5. Ưu điểm của hệ thống
+Kiến trúc tách lớp rõ ràng giữa phần cứng, MQTT, Web và Firebase.
+Dữ liệu realtime có độ trễ thấp.
+Hỗ trợ đa nền tảng Web, Mobile và Desktop.
+Có cơ chế AUTO tưới cây theo độ ẩm đất.
+Giao diện trực quan, dễ sử dụng.
+Có phân quyền admin/viewer.
+Hỗ trợ cấu hình mẫu theo loại cây.
+3.6.6. Hạn chế
+Bên cạnh các kết quả đạt được, hệ thống vẫn còn một số hạn chế:
+Một số thông tin cấu hình MQTT/Firebase vẫn đang hardcode trong mã nguồn demo.
+Mobile App chưa tích hợp đầy đủ Firebase Auth.
+Chưa triển khai CI/CD hoặc test tự động.
+Chưa đánh giá hiệu năng với số lượng lớn thiết bị.
+Chưa có cơ chế backup dữ liệu tự động.
+3.6.7. Hướng cải tiến
+Trong tương lai, hệ thống có thể được mở rộng theo các hướng:
+Hỗ trợ nhiều thiết bị ESP32 cùng lúc.
+Tích hợp AI/ML dự đoán lịch tưới.
+Push notification qua Firebase Cloud Messaging.
+Sử dụng InfluxDB hoặc TimescaleDB cho dữ liệu time-series.
+Đóng gói Docker và triển khai cloud.
+KẾT LUẬN VÀ HƯỚNG PHÁT TRIỂN
+Kết luận
+Sau quá trình nghiên cứu, thiết kế và triển khai, đồ án đã xây dựng thành công hệ thống Vườn Thông Minh ứng dụng công nghệ IoT sử dụng vi điều khiển ESP32 kết hợp giao thức MQTT và nền tảng Firebase nhằm hỗ trợ giám sát môi trường và điều khiển tưới nước từ xa theo thời gian thực.
+Hệ thống cho phép thu thập các thông số môi trường như nhiệt độ, độ ẩm không khí, độ ẩm đất và mực nước từ các cảm biến phần cứng, sau đó truyền dữ liệu lên MQTT Broker thông qua kết nối Wi-Fi. Dữ liệu được đồng bộ tới các ứng dụng Web, Mobile và Desktop để người dùng có thể theo dõi trạng thái khu vườn ở bất kỳ đâu có kết nối Internet.
+Về mặt phần mềm, đồ án đã xây dựng thành công dashboard đa nền tảng bằng React, React Native và Electron. Hệ thống hỗ trợ hiển thị dữ liệu realtime, biểu đồ lịch sử, cảnh báo môi trường, điều khiển bơm từ xa, cấu hình ngưỡng theo loại cây và phân quyền người dùng thông qua Firebase Authentication.
+Ngoài chức năng điều khiển thủ công, hệ thống còn hỗ trợ chế độ tưới tự động dựa trên độ ẩm đất. Khi giá trị độ ẩm đất giảm xuống dưới ngưỡng cấu hình, ESP32 sẽ tự động kích hoạt relay để bật máy bơm và ngắt bơm khi đất đạt độ ẩm mục tiêu. Cơ chế này giúp tiết kiệm thời gian chăm sóc cây trồng và hạn chế lãng phí nước.
+Trong quá trình triển khai thực nghiệm, hệ thống hoạt động tương đối ổn định. Dữ liệu cảm biến được cập nhật liên tục với độ trễ thấp, các thao tác điều khiển từ dashboard phản hồi nhanh và chức năng realtime hoạt động chính xác thông qua giao thức MQTT.
+Đồ án cũng giúp nhóm hiểu rõ hơn về mô hình hệ thống IoT hoàn chỉnh, từ phần cứng nhúng, giao tiếp mạng, xử lý dữ liệu realtime, đến phát triển ứng dụng đa nền tảng và triển khai cloud service. Đây là nền tảng quan trọng để tiếp tục nghiên cứu và phát triển các hệ thống IoT thực tế trong tương lai.
+Ưu điểm của hệ thống
+Hệ thống đạt được một số ưu điểm nổi bật như sau:
+Kiến trúc phân lớp rõ ràng giữa phần cứng, MQTT Broker, server và ứng dụng client.
+Hỗ trợ realtime với độ trễ thấp nhờ cơ chế publish/subscribe của MQTT.
+Có khả năng mở rộng nhiều thiết bị ESP32 trong tương lai.
+Hỗ trợ đa nền tảng gồm Web, Mobile và Desktop.
+Giao diện trực quan, dễ sử dụng và hỗ trợ dark theme.
+Có khả năng lưu lịch sử dữ liệu trên Firebase để phục vụ theo dõi và phân tích.
+Hỗ trợ cấu hình mẫu cây trồng giúp người dùng dễ dàng thiết lập hệ thống.
+Hỗ trợ cả điều khiển thủ công và điều khiển tự động.
+Hạn chế của hệ thống
+Bên cạnh các kết quả đạt được, hệ thống vẫn còn một số hạn chế nhất định:
+Chưa tối ưu hoàn toàn vấn đề bảo mật MQTT và Firebase.
+Một số thông tin cấu hình vẫn còn hardcode trong mã nguồn.
+Ứng dụng Mobile chưa hỗ trợ đầy đủ tất cả chức năng như phiên bản Web.
+Chưa triển khai cơ chế push notification khi có cảnh báo nguy hiểm.
+Chưa có hệ thống kiểm thử tự động và CI/CD.
+Dữ liệu lịch sử hiện lưu trên Firebase Realtime Database nên chưa tối ưu cho time-series lớn.
+Chưa đánh giá chi tiết các thông số hiệu năng như latency, throughput hoặc khả năng chịu tải khi có nhiều thiết bị kết nối đồng thời.
+Hướng phát triển
+Trong tương lai, hệ thống có thể được mở rộng và cải tiến theo các hướng sau:
+Mở rộng phần cứngTích hợp thêm các cảm biến như cảm biến pH đất, cảm biến chất lượng không khí hoặc camera giám sát cây trồng nhằm nâng cao khả năng phân tích môi trường.
+Tăng cường bảo mậtÁp dụng JWT, OAuth hoặc cơ chế xác thực nâng cao cho MQTT và API server; sử dụng biến môi trường và mã hóa thông tin nhạy cảm.
+Thông minh hóa hệ thốngỨng dụng Machine Learning hoặc AI để dự đoán nhu cầu tưới nước dựa trên lịch sử dữ liệu và điều kiện thời tiết.
+Push Notification và cảnh báoTích hợp Firebase Cloud Messaging để gửi thông báo trực tiếp đến điện thoại khi hệ thống phát hiện nguy hiểm hoặc sự cố.
+Mở rộng đa thiết bịHỗ trợ nhiều ESP32 và nhiều khu vườn trong cùng một hệ thống quản lý tập trung.
+Tối ưu lưu trữ dữ liệuSử dụng các cơ sở dữ liệu time-series như InfluxDB hoặc TimescaleDB để tăng hiệu năng lưu trữ và truy vấn dữ liệu dài hạn.
+Triển khai thực tếThiết kế mạch PCB hoàn chỉnh, hộp bảo vệ chống nước và hệ thống nguồn ổn định để triển khai ngoài môi trường thực tế.
+Tổng kết chung
+Nhìn chung, đồ án đã đáp ứng được các mục tiêu đề ra ban đầu về xây dựng một hệ thống IoT hỗ trợ giám sát và chăm sóc cây trồng tự động. Mặc dù vẫn còn một số hạn chế cần cải thiện, hệ thống đã chứng minh được tính khả thi của việc ứng dụng công nghệ IoT, MQTT và cloud computing vào bài toán nông nghiệp thông minh.
+Kết quả của đồ án không chỉ mang ý nghĩa học thuật mà còn có tiềm năng ứng dụng thực tế trong các mô hình vườn gia đình, nhà kính hoặc hệ thống nông nghiệp quy mô nhỏ trong tương lai.
+PHỤ LỤC: CODE SỬ DỤNG CHẠY TRƯƠNG TRÌNH
+Code hoạt động
+Code hoạt động của arduino #include <ArduinoJson.h> #include <dht.h>
+#include <SoftwareSerial.h> SoftwareSerial a(5, 6);
+// cảm biến ánh sáng
+#define LIGHT 3 // cảm biến ánh sáng
+#define pin_analog A1 #define pin_digital 3
+#define echopin 9 // echo pin #define trigpin 10// Trigger pin
+#define pin_mb2 13 //may bom doamdat #define pin_mb1 12 // may bom nhiet do #define pin_led 7// relay led
+unsigned long t1 = 0; unsigned long t2 = 0; unsigned long dem = 0;
+long duration, distance; long giatricu = 0;
+long giatricuden = 0;
+int giatricumaybom = 0; int giatricumaybom2 = 0;
+// cảm biến mua
+int sensorPin = A2; int muaValue = 0;
+// nhiet do do am dht DHT;
+//Constants
+#define DHT22_PIN 2	// DHT 22 (AM2302) - what pin we're connected to float doam; //Stores humidity value
+float nhietdo; //Stores temperature value
+void setup()
+{
+a.begin(115200);
+Serial.begin(9600);//Mở cổng Serial ở mức 960
+pinMode (pin_analog, INPUT); pinMode(pin_digital, INPUT); pinMode (pin_led, OUTPUT); pinMode (pin_mb1, OUTPUT); pinMode (pin_mb2, OUTPUT);
+//sieu am
+pinMode (trigpin, OUTPUT); pinMode (echopin, INPUT );
+}
+void loop()
+{
+if (millis() - t1 > 2000) { String chuoi = "";
+//maybomnhietdo
+//	if (digitalRead(pin_mb1) != giatricumaybom) { chuoi += digitalRead(pin_mb1);
+giatricumaybom = digitalRead(pin_mb1);
+//}
+//	if (digitalRead(pin_mb2) !=giatricumaybom2) { chuoi = chuoi + "!" + digitalRead(pin_mb2); giatricumaybom2 = digitalRead(pin_mb2);
+// }
+int L = digitalRead(LIGHT); if (L == 0) {
+chuoi = chuoi + "/0"; giatricuden = L;
+} else {
+chuoi = chuoi + "/1"; giatricuden = L;
+}
+// đo khoảng cách digitalWrite(trigpin, LOW); delayMicroseconds(2);
+digitalWrite(trigpin, HIGH); delayMicroseconds(10);
+duration = pulseIn (echopin, HIGH); distance = duration / 58.2;
+// if (distance != giatricu) {
+chuoi = chuoi + "#" + distance; giatricu = distance;
+// }
+int anadat = analogRead(A1);
+int doamdat = map(anadat, 1024, 0, 0, 100);
+// Serial.print("Độ ẩm đất: ");
+// Serial.println(doamdat); chuoi = chuoi + "-" + doamdat;
+// nhiet do do am
+int chk = DHT.read22(DHT22_PIN);
+//Read data and store it to variables hum and temp doam = DHT.humidity;
+nhietdo = DHT.temperature; chuoi = chuoi + "*" + nhietdo;
+chuoi = chuoi + "+" + digitalRead(pin_led); Serial.println(chuoi);
+a.print(chuoi); t1 = millis();
+}
+if (a.available() > 0) { char b = a.read(); Serial.println(b);
+if (b == '1') {
+digitalWrite(pin_mb1, HIGH); // kích hoạt rờ le Serial.println("dang bat");
+}
+if (b == '0') {
+digitalWrite(pin_mb1, LOW); // tắt rờ le Serial.println("dang tat");
+}
+if (b == '2') {
+digitalWrite(pin_led, HIGH); // bật rờ le
+//Serial.println("dang bat đèn");
+}
+if (b == '3') {
+digitalWrite(pin_led, LOW); // tắt rờ le
+// Serial.println("dang tat đèn");
+}
+if (b == '4') {
+digitalWrite(pin_mb2, HIGH); // kích hoạt rờ le Serial.println("dang bat");
+}
+if (b == '5') {
+digitalWrite(pin_mb2, LOW); // tắt rờ le Serial.println("dang tat");
+}
+}
+}
+Code hoạt động của Esp8266
+#include <SocketIoClient.h> #include <ESP8266WiFi.h> #include <ArduinoJson.h> #include <SoftwareSerial.h> #include <WiFiManager.h> SoftwareSerial a(D6, D5);
+#define USER_SERIAL Serial SocketIoClient socket;
+char host[]="pushmongo.herokuapp.com";
+void setup() {
+// put your setup code here, to run once: Serial.begin(9600);
+connectWiFi(); a.begin(115200);
+//socket.begin("192.168.43.2", 3000); socket.begin(host,80);
+// socket.begin("172.20.10.3", 3000);
+//socket.begin("192.168.43.32", 3000);
+}
+void loop() {
+// put your main code here, to run repeatedly: socket.loop();
+while (a.available() > 0) { String b = "";
+int b0 = 0; int b1 = 0; int b2 = 0; int b3 = 0; int b4 = 0; int b5 = 0;
+b = a.readString(); Serial.println(b);
+for (int i = 0; i < b.length(); i++) { if (b[i] == '!') {
+b0 = i;
+}
+if (b[i] == '/') { b1 = i;
+}
+if (b[i] == '#') {
+b2 = i;
+}
+if (b[i] == '-') {
+b3 = i;
+}
+if (b[i] == '*') { b4 = i;
+}
+if (b[i] == '+') {
+b5 = i;
+}
+}
+//
+String mbnd = b.substring(0, b0); String mbdad = b.substring(b0 + 1, b1);
+String anhsang = b.substring(b1 + 1, b2); String khoangcach = b.substring(b2 + 1, b3); String dad = b.substring(b3 + 1, b4);
+String nd = b.substring(b4 + 1, b5); String den = b.substring(b5 + 1);
+String c = "{\"nhietdo\":\"" + nd + "\",\"doamdat\":\"" + dad + "\"}"; static char charBuf[200];
+c.toCharArray(charBuf, c.length() + 1); char *chuyenchuoi = charBuf; socket.emit("message", chuyenchuoi);
+// cảm biến ánh sáng
+String cbanhsang = "{\"anhsang\":\"" + anhsang + "\"}"; static char asang[30];
+cbanhsang.toCharArray(asang, cbanhsang.length() + 1); char *light = asang;
+socket.emit("send-anhsang", asang);
+// muc nuoc
+String d = "{\"mucnuoc\":\"" + khoangcach + "\"}";
+static char muc[30]; d.toCharArray(muc, d.length() + 1); char *mn = muc;
+socket.emit("send-mn", mn);
+// lấy trạng thái máy bơm nhiet do
+String e = "{\"ttmaybom\":\"" + mbnd + "\"}"; static char mb[5];
+e.toCharArray(mb, e.length() + 1); char *maybomnd = mb;
+// socket.emit("send-ttmb", maybomnd);
+// lấy trạng thái máy bơm dad
+String mdad = "{\"ttmaybomdad\":\"" + mbdad + "\"}"; static char mb2[5];
+mdad.toCharArray(mb2, mdad.length() + 1); char *maybomdad = mb2;
+// socket.emit("send-ttmb2", maybomdad);
+// lấy trạng thái đèn
+String ttden = "{\"ttden\":\"" + den + "\"}"; static char den2[5]; ttden.toCharArray(den2, ttden.length() + 1); char *ttcuaden = den2;
+socket.emit("send-ttden", ttcuaden);
+}
+socket.on("reply", control_maybom); socket.on("den-led", controlled);
+socket.on("server-send-mbd", control_maybomdad);
+}
+void control_maybom(const char* message, size_t length) { StaticJsonDocument<200> doc;
+DeserializationError error = deserializeJson(doc, message);
+if (error) {
+Serial.print(F("deserializeJson() failed: ")); Serial.println(error.f_str());
+return;
+}
+const char* b = doc["maybom"]; a.print(b);
+Serial.println(b);
+}
+void control_maybomdad(const char* message, size_t length) { StaticJsonDocument<200> doc;
+DeserializationError error = deserializeJson(doc, message);
+if (error) {
+Serial.print(F("deserializeJson() failed: ")); Serial.println(error.f_str());
+return;
+}
+const char* b = doc["maybomdad"]; a.print(b);
+Serial.println(b);
+}
+void controlled(const char* message, size_t length) { StaticJsonDocument<200> doc;
+DeserializationError error = deserializeJson(doc, message);
+if (error) {
+Serial.print(F("deserializeJson() failed: ")); Serial.println(error.f_str());
+return;
+}
+const char* c = doc["led"]; a.print(c); Serial.println(c);
+}
+void connectWiFi() { WiFiManager wifiManager;
+wifiManager.autoConnect("Wifi config", "123456789"); if (WiFi.status() == WL_CONNECTED)
+{
+Serial.printf("Connected, mac address: %s\n", WiFi.macAddress().c_str()); String m= ""+WiFi.macAddress();
+String mac = "{\"mac\":\"" + m + "\"}"; static char MAC[30]; mac.toCharArray(MAC, mac.length() + 1); char *macESP = MAC; socket.emit("macESP", macESP);
+}
+}
+Tài liệu tham khảo
+http://arduino.vn/ https://www.w3schools.com/ https://khoapham.vn/ https://www.google.com/ https://www.youtube.com/

@@ -1,0 +1,59 @@
+@startuml hinh_2_1b_state_trang_thai_vuon
+' Hình 2.1b - State diagram trạng thái vườn (PlantUML 1.2026+)
+' Render: https://www.plantuml.com/plantuml/uml/
+
+skinparam shadowing false
+skinparam roundcorner 18
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 13
+skinparam ArrowColor #37474F
+skinparam state {
+  BorderColor #263238
+  FontStyle bold
+  MinWidth 160
+  Padding 14
+}
+
+title Hình 2.1b - Sơ đồ trạng thái tình trạng khu vườn
+
+top to bottom direction
+
+[*] --> CHUA
+
+state "Chưa cấu hình" as CHUA #ECEFF1
+state "Tốt" as TOT #A5D6A7
+state "Cần chú ý" as CAN #FFE082
+state "Nguy hiểm" as NGUY #EF9A9A
+
+CHUA --> TOT : nhận cấu hình\nesp32/config
+TOT --> CAN : mức 1
+CAN --> NGUY : mức 2
+
+note right of CHUA #F5F5F5
+  **CHUA_CAU_HINH**
+  Chưa có ngưỡng
+end note
+
+note right of TOT #E8F5E9
+  **TOT**
+  Môi trường trong ngưỡng
+end note
+
+note right of CAN #FFF8E1
+  **CAN_CHU_Y**
+  Mức 1
+end note
+
+note right of NGUY #FFEBEE
+  **NGUY_HIEM**
+  Mức 2
+end note
+
+note bottom #FAFAFA
+  **Mức 1:** đất < minSoil  hoặc  nhiệt > maxTemp  hoặc  độ ẩm KK < minAirHum
+  **Mức 2:** đất < minSoil−10  hoặc  nhiệt > maxTemp+5  hoặc  KK < minAirHum−10
+  **Hồi phục:** khi chỉ số cải thiện → chuyển ngược về trạng thái thấp hơn (ví dụ NGUY → CAN → TOT).
+  Tính trên Web (App.js) và firmware ESP32; có thể dùng trường **garden_status** từ MQTT.
+end note
+
+@enduml

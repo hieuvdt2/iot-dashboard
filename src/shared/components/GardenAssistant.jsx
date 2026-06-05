@@ -227,7 +227,7 @@ function GardenAssistant({
               ref={inputRef}
               type="text"
               className="assistant-input"
-              placeholder="Hỏi về cây trồng, ngưỡng, preset..."
+              placeholder="Hỏi về cây trồng, ngưỡng, mẫu cài đặt..."
               value={input}
               disabled={loading}
               onChange={(e) => setInput(e.target.value)}

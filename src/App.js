@@ -10,7 +10,8 @@ import EnvironmentToast from './shared/components/EnvironmentToast';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import AdminPage from './pages/AdminPage';
-import { mqttService } from './shared/services/mqttService';
+import { mqttService, normalizeSensorPayload } from './shared/services/mqttService';
+import { normalizeEntry } from './shared/utils/sensorHistory';
 import { firebaseService } from './shared/services/firebaseService';
 import {
   buildHistoryFromFirebase,
@@ -25,8 +26,10 @@ const DEFAULT_CONFIG = {
   maxTemp: 35,
   minAirHum: 50,
   maxLux: 20000,
-  maxWaterDistance: 20,
 };
+
+// maxWaterDistance là cài đặt phần cứng (kích thước bể), không phải thuộc tính cây
+const DEFAULT_MAX_WATER_DISTANCE = 20;
 
 const THRESHOLD_KEYS = [
   'minSoil',
@@ -34,7 +37,6 @@ const THRESHOLD_KEYS = [
   'maxTemp',
   'minAirHum',
   'maxLux',
-  'maxWaterDistance',
 ];
 
 const loadStoredThresholds = () => {
@@ -55,53 +57,25 @@ const BASE_PRESETS = [
     key: 'rau',
     name: 'Rau',
     isCustom: false,
-    config: {
-      minSoil: 45,
-      targetSoil: 70,
-      maxTemp: 32,
-      minAirHum: 55,
-      maxLux: 18000,
-      maxWaterDistance: 20,
-    },
+    config: { minSoil: 45, targetSoil: 70, maxTemp: 32, minAirHum: 55, maxLux: 18000 },
   },
   {
     key: 'xuong_rong',
     name: 'Xương rồng',
     isCustom: false,
-    config: {
-      minSoil: 15,
-      targetSoil: 30,
-      maxTemp: 38,
-      minAirHum: 35,
-      maxLux: 22000,
-      maxWaterDistance: 25,
-    },
+    config: { minSoil: 15, targetSoil: 30, maxTemp: 38, minAirHum: 35, maxLux: 22000 },
   },
   {
     key: 'lan',
     name: 'Lan',
     isCustom: false,
-    config: {
-      minSoil: 40,
-      targetSoil: 60,
-      maxTemp: 30,
-      minAirHum: 60,
-      maxLux: 16000,
-      maxWaterDistance: 20,
-    },
+    config: { minSoil: 40, targetSoil: 60, maxTemp: 30, minAirHum: 60, maxLux: 16000 },
   },
   {
     key: 'cay_canh',
     name: 'Cây cảnh',
     isCustom: false,
-    config: {
-      minSoil: 35,
-      targetSoil: 55,
-      maxTemp: 34,
-      minAirHum: 50,
-      maxLux: 18000,
-      maxWaterDistance: 20,
-    },
+    config: { minSoil: 35, targetSoil: 55, maxTemp: 34, minAirHum: 50, maxLux: 18000 },
   },
 ];
 
@@ -151,8 +125,7 @@ function App() {
   const [latestLoaded, setLatestLoaded] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [presetsLoaded, setPresetsLoaded] = useState(false);
-  const [historyFilter, setHistoryFilter] = useState(20);
-  const [historyDate, setHistoryDate] = useState(() =>
+  const [historyDate] = useState(() =>
     new Date().toISOString().slice(0, 10)
   );
   const [toast, setToast] = useState(null);
@@ -167,6 +140,7 @@ function App() {
   const userMenuRef = useRef(null);
   const [users, setUsers] = useState({});
   const [roles, setRoles] = useState({});
+  const [adminDbError, setAdminDbError] = useState(null);
   const [configReady, setConfigReady] = useState(() => {
     try {
       return Boolean(localStorage.getItem('iot_thresholds'));
@@ -176,6 +150,12 @@ function App() {
   });
   const [deployedThresholds, setDeployedThresholds] = useState(loadStoredThresholds);
   const [draftThresholds, setDraftThresholds] = useState(loadStoredThresholds);
+  const [maxWaterDistance, setMaxWaterDistance] = useState(() => {
+    try {
+      const v = localStorage.getItem('iot_max_water_distance');
+      return v ? Number(v) : DEFAULT_MAX_WATER_DISTANCE;
+    } catch { return DEFAULT_MAX_WATER_DISTANCE; }
+  });
 
   const presets = useMemo(() => [...BASE_PRESETS, ...customPresets], [customPresets]);
   const canEdit = role === 'admin';
@@ -204,8 +184,21 @@ function App() {
     console.log('[Env] Thong tin bien moi truong:', envSnapshot);
   }, []);
 
-  const handleSensor = useCallback((data) => {
-    setSensorData(data || null);
+  const handleSensor = useCallback((raw) => {
+    if (!raw) {
+      setSensorData(null);
+      return;
+    }
+    const n = normalizeEntry(raw);
+    const aliases = normalizeSensorPayload(raw);
+    setSensorData({
+      ...raw,
+      nhiet_do: n.nhiet_do ?? aliases.temp ?? raw.nhiet_do,
+      do_am_khong_khi: n.do_am_khong_khi ?? aliases.humi ?? raw.do_am_khong_khi,
+      do_am_dat: n.do_am_dat ?? aliases.soil ?? raw.do_am_dat,
+      anh_sang: n.anh_sang ?? aliases.lux ?? raw.anh_sang,
+      muc_nuoc: n.muc_nuoc ?? aliases.distance ?? raw.muc_nuoc,
+    });
   }, []);
 
   const handleConnect = useCallback((status) => {
@@ -219,11 +212,13 @@ function App() {
   useEffect(() => {
     mqttService.on('connect', handleConnect);
     mqttService.on('status', handleStatus);
+    mqttService.on('sensor', handleSensor);
     mqttService.connect();
 
     return () => {
       mqttService.off('connect', handleConnect);
       mqttService.off('status', handleStatus);
+      mqttService.off('sensor', handleSensor);
     };
   }, [handleSensor, handleConnect, handleStatus]);
 
@@ -303,6 +298,7 @@ function App() {
       if (roleUnsubscribe) roleUnsubscribe();
       if (user) {
         roleUnsubscribe = firebaseService.subscribeRole(user.uid, setRole);
+        firebaseService.ensureUserProfile(user).catch(() => {});
       } else {
         setRole('viewer');
       }
@@ -318,21 +314,22 @@ function App() {
     if (!authUser || role !== 'admin') {
       setUsers({});
       setRoles({});
+      setAdminDbError(null);
       return undefined;
     }
 
-    const unsubscribeUsers = firebaseService.subscribeUsers(setUsers);
-    const unsubscribeRoles = firebaseService.subscribeRoles(setRoles);
+    setAdminDbError(null);
+    const onDbError = (err) => {
+      setAdminDbError(err?.message || 'Không đọc được users/roles (kiểm tra Rules Firebase).');
+    };
+    const unsubscribeUsers = firebaseService.subscribeUsers(setUsers, onDbError);
+    const unsubscribeRoles = firebaseService.subscribeRoles(setRoles, onDbError);
 
     return () => {
       unsubscribeUsers();
       unsubscribeRoles();
     };
   }, [authUser, role]);
-
-  const clearHistory = () => {
-    setHistory([]);
-  };
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -358,7 +355,7 @@ function App() {
     }
     setSelectedPreset('');
     setDraftThresholds({ ...config });
-    setToast({ type: 'success', message: 'Đã cập nhật bản nháp. Bấm "Lưu & Gửi ESP32" để áp dụng.' });
+    setToast({ type: 'success', message: 'Đã cập nhật bản nháp. Bấm "Áp dụng lên thiết bị" để gửi.' });
   };
 
   const applyAssistantSuggestion = (config, presetKey = '', label = '') => {
@@ -376,8 +373,8 @@ function App() {
     setToast({
       type: 'success',
       message: label
-        ? `Đã áp dụng gợi ý "${label}" vào bản nháp. Kiểm tra tab Cấu hình rồi bấm Lưu & Gửi ESP32.`
-        : 'Đã áp dụng gợi ý vào bản nháp. Kiểm tra tab Cấu hình rồi bấm Lưu & Gửi ESP32.',
+        ? `Đã áp dụng gợi ý "${label}" vào bản nháp. Kiểm tra tab Cấu hình rồi bấm "Áp dụng lên thiết bị".`
+        : 'Đã áp dụng gợi ý vào bản nháp. Kiểm tra tab Cấu hình rồi bấm "Áp dụng lên thiết bị".',
     });
   };
 
@@ -385,7 +382,7 @@ function App() {
     setDraftThresholds({ ...deployedThresholds });
     const matchedPreset = presets.find((item) => thresholdsEqual(item.config, deployedThresholds));
     setSelectedPreset(matchedPreset?.key || '');
-    setToast({ type: 'success', message: 'Đã khôi phục cấu hình đang chạy trên ESP32.' });
+    setToast({ type: 'success', message: 'Đã khôi phục cài đặt đang dùng trên thiết bị.' });
   };
 
   const saveThresholds = () => {
@@ -406,14 +403,14 @@ function App() {
     setToast({
       type: 'success',
       message: presetName
-        ? `Đã gửi preset "${presetName}" xuống ESP32`
-        : 'Đã gửi cấu hình xuống ESP32',
+        ? `Đã áp dụng mẫu "${presetName}" lên thiết bị`
+        : 'Đã áp dụng cài đặt lên thiết bị',
     });
   };
 
   const selectPreset = (presetKey) => {
     if (!canEdit) {
-      setToast({ type: 'warning', message: 'Bạn không có quyền chọn preset.' });
+      setToast({ type: 'warning', message: 'Bạn không có quyền chọn mẫu.' });
       return;
     }
     if (!presetKey) {
@@ -426,18 +423,18 @@ function App() {
     setDraftThresholds({ ...preset.config });
     setToast({
       type: 'success',
-      message: `Đã chọn preset "${preset.name}". Bấm "Lưu & Gửi ESP32" để áp dụng.`,
+      message: `Đã chọn mẫu "${preset.name}". Bấm "Áp dụng lên thiết bị" để gửi.`,
     });
   };
 
   const addPreset = (name, config) => {
     if (!canEdit) {
-      setToast({ type: 'warning', message: 'Bạn không có quyền thêm preset.' });
-      return;
+      setToast({ type: 'warning', message: 'Bạn không có quyền thêm mẫu.' });
+    return;
     }
     const trimmed = name.trim();
     if (!trimmed) {
-      setToast({ type: 'warning', message: 'Vui lòng nhập tên preset.' });
+      setToast({ type: 'warning', message: 'Vui lòng nhập tên mẫu.' });
       return;
     }
     const baseKey = toPresetKey(trimmed) || 'preset';
@@ -449,33 +446,33 @@ function App() {
       suffix += 1;
     }
     firebaseService.savePreset(key, { name: trimmed, config: { ...config } });
-    setToast({ type: 'success', message: `Đã thêm preset: ${trimmed}` });
+    setToast({ type: 'success', message: `Đã thêm mẫu: ${trimmed}` });
   };
 
   const updatePreset = (presetKey, name, config) => {
     if (!canEdit) {
-      setToast({ type: 'warning', message: 'Bạn không có quyền sửa preset.' });
-      return;
+      setToast({ type: 'warning', message: 'Bạn không có quyền sửa mẫu.' });
+    return;
     }
     const trimmed = name.trim();
     if (!trimmed) {
-      setToast({ type: 'warning', message: 'Vui lòng nhập tên preset.' });
+      setToast({ type: 'warning', message: 'Vui lòng nhập tên mẫu.' });
       return;
     }
     firebaseService.savePreset(presetKey, { name: trimmed, config: { ...config } });
-    setToast({ type: 'success', message: `Đã cập nhật preset: ${trimmed}` });
+    setToast({ type: 'success', message: `Đã cập nhật mẫu: ${trimmed}` });
   };
 
   const deletePreset = (presetKey) => {
     if (!canEdit) {
-      setToast({ type: 'warning', message: 'Bạn không có quyền xóa preset.' });
+      setToast({ type: 'warning', message: 'Bạn không có quyền xóa mẫu.' });
       return;
     }
     firebaseService.deletePreset(presetKey);
     if (selectedPreset === presetKey) {
       setSelectedPreset('');
     }
-    setToast({ type: 'success', message: 'Đã xóa preset.' });
+    setToast({ type: 'success', message: 'Đã xóa mẫu.' });
   };
 
   const handleSignIn = async (email, password) => {
@@ -536,8 +533,8 @@ function App() {
   );
 
   const alerts = useMemo(
-    () => (hasConfig && sensorData ? buildEnvironmentAlerts(sensorData, deployedThresholds) : []),
-    [sensorData, hasConfig, deployedThresholds]
+    () => (hasConfig && sensorData ? buildEnvironmentAlerts(sensorData, deployedThresholds, maxWaterDistance) : []),
+    [sensorData, hasConfig, deployedThresholds, maxWaterDistance]
   );
 
   const gardenStatus = (() => {
@@ -597,9 +594,6 @@ function App() {
   };
   const gardenStatusLabel = gardenStatusLabelMap[gardenStatus] || gardenStatus;
   const pumpStatusLabel = pumpStatusLabelMap[pumpStatus] || pumpStatus;
-  const gardenStatusClass = typeof gardenStatus === 'string'
-    ? gardenStatus.toLowerCase()
-    : 'muted';
 
   const autoModeLabelMap = {
     BAT: 'Tự động',
@@ -611,8 +605,15 @@ function App() {
   const pumpOn = pumpStatus === 'DANG_TUOI';
   const waterDistance = sensorData?.muc_nuoc ?? null;
   const waterPct = waterDistance !== null
-    ? Math.min(100, Math.max(0, 100 - Math.round((waterDistance / (deployedThresholds.maxWaterDistance ?? 25)) * 100)))
+    ? Math.min(100, Math.max(0, 100 - Math.round((waterDistance / (maxWaterDistance ?? 25)) * 100)))
     : 0;
+  // Trạng thái bể: small distance = full tank (sensor ở đỉnh, đo xuống mặt nước)
+  const waterStatus = waterDistance === null ? null
+    : waterDistance <= maxWaterDistance * 0.5 ? 'full'   // Đủ nước
+    : waterDistance <= maxWaterDistance       ? 'low'    // Thấp
+    : 'empty';                                           // Cạn — khoá bơm
+  const waterStatusLabel = { full: '✓ Đủ nước', low: '⚠ Nước thấp', empty: '✗ Cạn', null: '--' }[waterStatus];
+  const waterStatusColor = { full: '#16a34a', low: '#d97706', empty: '#dc2626', null: '#9ca3af' }[waterStatus];
 
   const needsWatering = Boolean(
     hasConfig && sensorData && sensorData.do_am_dat < deployedThresholds.minSoil
@@ -661,31 +662,27 @@ function App() {
   const avatarUrl = authUser?.photoURL || null;
   const avatarInitial = displayName[0]?.toUpperCase() || '?';
 
-  /* Chờ Firebase kiểm tra session — tránh flash màn hình login */
-  if (authLoading) {
-    return (
-      <div style={{
-        height: '100vh', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-        gap: 16,
-      }}>
-        <div style={{
-          width: 48, height: 48, borderRadius: '50%',
-          border: '4px solid #e5e7eb',
-          borderTop: '4px solid #22c55e',
-          animation: 'spin 0.8s linear infinite',
-        }}/>
-        <div style={{ fontSize: '0.9rem', color: '#6b7280', fontWeight: 500 }}>
-          Đang khôi phục phiên đăng nhập...
-        </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
-  }
-
   return (
     <BrowserRouter>
+      {authLoading ? (
+        <div style={{
+          height: '100vh', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+          gap: 16,
+        }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: '50%',
+            border: '4px solid #e5e7eb',
+            borderTop: '4px solid #22c55e',
+            animation: 'spin 0.8s linear infinite',
+          }} />
+          <div style={{ fontSize: '0.9rem', color: '#6b7280', fontWeight: 500 }}>
+            Đang khôi phục phiên đăng nhập...
+          </div>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      ) : (
       <div className="app">
         {/* ===== SIDEBAR ===== */}
         <aside className="sidebar">
@@ -830,15 +827,29 @@ function App() {
 
 
 
-          <main className="app-main">
+          <main className={`app-main${activeTab === 'dashboard' ? ' garden-dark' : ''}`}>
             <Routes>
               <Route
                 path="/dang-nhap"
-                element={<LoginPage onSignIn={handleSignIn} authError={authError} />}
+                element={
+                  <LoginPage
+                    onSignIn={handleSignIn}
+                    authError={authError}
+                    authUser={authUser}
+                    authLoading={authLoading}
+                  />
+                }
               />
               <Route
                 path="/dang-ky"
-                element={<RegisterPage onSignUp={handleSignUp} authError={authError} />}
+                element={
+                  <RegisterPage
+                    onSignUp={handleSignUp}
+                    authError={authError}
+                    authUser={authUser}
+                    authLoading={authLoading}
+                  />
+                }
               />
               <Route
                 path="/admin"
@@ -850,6 +861,8 @@ function App() {
                       roles={roles}
                       onSetRole={handleSetRole}
                       authUser={authUser}
+                      adminDbError={adminDbError}
+                      currentRole={role}
                     />
                   ) : (
                     <Navigate to="/dang-nhap" replace />
@@ -875,20 +888,14 @@ function App() {
                         configReady={configReady}
                         sensorData={sensorData}
                         connected={connected}
+                        gardenStatus={gardenStatus}
                         gardenStatusLabel={gardenStatusLabel}
-                        gardenStatusClass={gardenStatusClass}
                         autoMode={autoMode}
                         pumpStatus={pumpStatus}
                         pumpStatusLabel={pumpStatusLabel}
-                        needsWatering={needsWatering}
                         history={history}
-                        historyFilter={historyFilter}
-                        onHistoryFilterChange={(value) => setHistoryFilter(value)}
-                        historyDate={historyDate}
-                        onHistoryDateChange={(value) => setHistoryDate(value)}
-                        onClearHistory={clearHistory}
-                        canControl={canControl}
                         thresholds={deployedThresholds}
+                        maxWaterDistance={maxWaterDistance}
                       />
                     ) : (
                       <ConfigPage
@@ -899,6 +906,11 @@ function App() {
                         deployedThresholds={deployedThresholds}
                         hasUnsavedDraft={hasUnsavedDraft}
                         sensorData={sensorData}
+                        maxWaterDistance={maxWaterDistance}
+                        onMaxWaterDistanceChange={(val) => {
+                          setMaxWaterDistance(val);
+                          try { localStorage.setItem('iot_max_water_distance', String(val)); } catch {}
+                        }}
                         onSelectPreset={selectPreset}
                         onApplyDraft={applyDraftThresholds}
                         onDiscardDraft={discardDraft}
@@ -946,6 +958,16 @@ function App() {
                                 {waterDistance !== null ? `${waterDistance} cm` : '--'}
                               </div>
                             </div>
+                            {waterStatus && (
+                              <div style={{
+                                position: 'absolute', top: -28, left: 0, right: 0,
+                                textAlign: 'center',
+                                fontSize: '0.75rem', fontWeight: 700,
+                                color: waterStatusColor,
+                              }}>
+                                {waterStatusLabel}
+                              </div>
+                            )}
                             <div className="pipe">
                               <div className="pipe-line" />
                               <div className="pipe-flow" />
@@ -1009,6 +1031,7 @@ function App() {
           />
         )}
       </div>
+      )}
     </BrowserRouter>
   );
 }
