@@ -12,6 +12,45 @@ export function dimColor(hex, mix = 0.55) {
   return `rgb(${blend(r)}, ${blend(g)}, ${blend(b)})`;
 }
 
+/**
+ * Ghép giá trị vào giờ hiện tại chỉ khi bucket trống.
+ * Mỗi giờ snapshot một lần — không cập nhật liên tục theo tick cảm biến.
+ */
+export function hourly24WithLive(entries, sensorKey, liveValue = null, liveSeedRef = null, chartHour = new Date().getHours()) {
+  const pts = hourly24Filled(entries, sensorKey, null);
+  const nowH = chartHour;
+  if (pts[nowH]?.hasData) return pts;
+
+  let seedVal = null;
+  if (liveSeedRef?.current?.hour === nowH) {
+    seedVal = liveSeedRef.current.value;
+  } else {
+    const live = safeNum(liveValue);
+    if (live == null) return pts;
+    if (liveSeedRef) liveSeedRef.current = { hour: nowH, value: live };
+    seedVal = live;
+  }
+
+  return pts.map((p, h) => (h !== nowH ? p : { ...p, value: seedVal, hasData: true }));
+}
+
+/** Cắt cửa sổ giờ: recent = N giờ gần nhất; full24 = cả ngày 0–23h */
+export function sliceHourlyWindow(pts, mode = 'full24', chartHour = new Date().getHours(), recentHours = 8) {
+  if (mode !== 'recent' || !pts?.length) return pts;
+  const endH = chartHour;
+  const startH = Math.max(0, endH - recentHours + 1);
+  return pts.slice(startH, endH + 1).map((p, i) => {
+    const h = startH + i;
+    const isFirst = i === 0;
+    const isLast = h === endH;
+    return {
+      ...p,
+      hour: h,
+      label: isFirst || isLast || h % 3 === 0 ? `${String(h).padStart(2, '0')}h` : '',
+    };
+  });
+}
+
 /** 24 điểm theo giờ 0–23, trục X trái → phải */
 export function hourly24Filled(entries, sensorKey, fallbackAvg = null) {
   const fb = safeNum(fallbackAvg);
@@ -52,8 +91,10 @@ export function computeYRange(...series) {
   let min = Math.min(...vals);
   let max = Math.max(...vals);
   if (min === max) { min -= 1; max += 1; }
-  const pad = (max - min) * 0.12 || 1;
-  return Math.ceil((max + pad) * 10) / 10;
+  const span = max - min || 1;
+  // Headroom phía trên — đường cong (bezier) hay vượt maxValue và bị cắt
+  const topPad = Math.max(span * 0.24, max * 0.1, 3);
+  return Math.ceil((max + topPad) * 10) / 10;
 }
 
 export function seriesMinMax(points) {

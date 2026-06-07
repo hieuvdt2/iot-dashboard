@@ -408,6 +408,7 @@ export default function HistoryDetailSheet({
           </View>
 
           <Text style={s.sectionTitle}>Diễn biến theo giờ</Text>
+          <Text style={s.sectionHint}>Cả ngày 0h–23h · So sánh hôm qua (nét đứt)</Text>
           <View style={s.chartCard}>
             {!hasChart && !loading ? (
               <Text style={s.empty}>Chưa đủ dữ liệu để vẽ biểu đồ.</Text>
@@ -424,6 +425,7 @@ export default function HistoryDetailSheet({
                 selectedLabel={selectedLabel}
                 compareLabel={dayShortLabel(yesterdayKey)}
                 showHero={false}
+                hourWindow="full24"
               />
             )}
           </View>
@@ -638,7 +640,13 @@ const s = StyleSheet.create({
 
   sectionTitle: {
     fontSize: 20, fontWeight: '700', color: '#1a3028',
-    marginHorizontal: 20, marginBottom: 10, marginTop: 8,
+    marginHorizontal: 20, marginBottom: 4, marginTop: 8,
+  },
+  sectionHint: {
+    fontSize: 13,
+    color: '#8ab49a',
+    marginHorizontal: 20,
+    marginBottom: 10,
   },
   card: {
     marginHorizontal: 16, backgroundColor: '#fff', borderRadius: 16,
@@ -649,12 +657,13 @@ const s = StyleSheet.create({
     marginHorizontal: 16,
     backgroundColor: '#fff',
     borderRadius: 16,
-    paddingVertical: 8,
+    paddingVertical: 12,
     paddingHorizontal: 8,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#e2ece5',
     alignItems: 'center',
+    overflow: 'visible',
   },
   summaryCard: {
     marginHorizontal: 16, backgroundColor: '#fff', borderRadius: 18,

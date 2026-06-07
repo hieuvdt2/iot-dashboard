@@ -76,6 +76,23 @@ function hasAnyData(data, keys) {
   return data.some((row) => keys.some((k) => row[k] != null));
 }
 
+function countFieldData(data, key) {
+  return data.filter((row) => row[key] != null).length;
+}
+
+function chartDot(chartData, key, color) {
+  const n = countFieldData(chartData, key);
+  if (n === 0) return false;
+  const dotStyle = { r: 4, fill: color, stroke: '#fff', strokeWidth: 1.5 };
+  if (n <= 2) return dotStyle;
+  return (props) => {
+    if (props.payload?.fromLive && props.cx != null && props.cy != null) {
+      return <circle cx={props.cx} cy={props.cy} r={4} fill={color} stroke="#fff" strokeWidth={1.5} />;
+    }
+    return null;
+  };
+}
+
 export default function GardenCharts({ chartData, loading, maxWaterDistance, tankFullDistance }) {
   const tempStats = useMemo(() => seriesMinMax(chartData, 'nhiet_do'), [chartData]);
   const soilStats = useMemo(() => seriesMinMax(chartData, 'do_am_dat'), [chartData]);
@@ -140,7 +157,7 @@ export default function GardenCharts({ chartData, loading, maxWaterDistance, tan
               fill="url(#tempGrad)"
               connectNulls
               animationDuration={800}
-              dot={false}
+              dot={chartDot(chartData, 'nhiet_do', COLORS.temp)}
               activeDot={{ r: 5, fill: COLORS.temp }}
             />
           </AreaChart>
@@ -183,7 +200,7 @@ export default function GardenCharts({ chartData, loading, maxWaterDistance, tan
               fill="url(#soilGrad)"
               connectNulls
               animationDuration={800}
-              dot={false}
+              dot={chartDot(chartData, 'do_am_dat', COLORS.soil)}
               activeDot={{ r: 5, fill: COLORS.soil }}
             />
           </AreaChart>
@@ -210,7 +227,7 @@ export default function GardenCharts({ chartData, loading, maxWaterDistance, tan
               strokeWidth={2.5}
               connectNulls
               animationDuration={800}
-              dot={false}
+              dot={chartDot(chartData, 'do_am_khong_khi', COLORS.air)}
               activeDot={{ r: 5, fill: COLORS.air }}
             />
           </LineChart>
@@ -284,7 +301,7 @@ export default function GardenCharts({ chartData, loading, maxWaterDistance, tan
                   strokeWidth={2.5}
                   connectNulls
                   animationDuration={800}
-                  dot={false}
+                  dot={chartDot(waterChartData, 'muc_nuoc_pct', COLORS.water)}
                   activeDot={{ r: 5, fill: COLORS.water }}
                 />
               </LineChart>
