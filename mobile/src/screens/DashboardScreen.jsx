@@ -31,7 +31,6 @@ const TEXT_MED    = '#4a7a5a';
 const TEXT_WHITE  = TEXT_DARK;
 const TEXT_DIM    = TEXT_MED;
 
-const DEFAULT_MAX_WATER_DIST = 20;
 const DEFAULT_TANK_FULL_DIST = DEFAULT_TANK_FULL_DISTANCE;
 
 const VN_DAY = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
@@ -109,9 +108,7 @@ function HeroCard({ sensorData, pumpState, autoMode, maxWaterDist, tankFullDist 
   const air   = sensorData?.airHum      ?? null;
   const light = sensorData?.light       ?? null;
   const wDist = sensorData?.waterLevel  ?? null;
-  const maxD  = maxWaterDist ?? DEFAULT_MAX_WATER_DIST;
-  const fullD = tankFullDist ?? DEFAULT_TANK_FULL_DIST;
-  const wPct  = waterDistanceToPercent(wDist, maxD, fullD);
+  const wPct  = waterDistanceToPercent(wDist, maxWaterDist, tankFullDist);
 
   // Date: "Thứ năm, 05 Tháng 6 2026"
   const now     = new Date();
@@ -550,8 +547,8 @@ const dl = StyleSheet.create({
 
 function WaterCard({ sensorData, maxWaterDist, tankFullDist }) {
   const wDist = sensorData?.waterLevel ?? null;
-  const maxD  = maxWaterDist ?? DEFAULT_MAX_WATER_DIST;
-  const fullD = tankFullDist ?? DEFAULT_TANK_FULL_DIST;
+  const maxD  = maxWaterDist;
+  const fullD = tankFullDist;
   const pct   = waterDistanceToPercent(wDist, maxD, fullD);
   const status = wDist == null || pct == null ? null
     : pct >= 55 ? { label: '✓ Đủ nước',   color: '#4ade80' }
@@ -602,9 +599,7 @@ function DetailCards({ sensorData, dailyData, maxWaterDist, tankFullDist }) {
   const air   = sensorData?.airHum      ?? null;
   const light = sensorData?.light       ?? null;
   const wDist = sensorData?.waterLevel  ?? null;
-  const maxD  = maxWaterDist ?? DEFAULT_MAX_WATER_DIST;
-  const fullD = tankFullDist ?? DEFAULT_TANK_FULL_DIST;
-  const wPct  = waterDistanceToPercent(wDist, maxD, fullD);
+  const wPct  = waterDistanceToPercent(wDist, maxWaterDist, tankFullDist);
 
   const avg30 = useMemo(() => {
     if (!dailyData.length) return {};
@@ -836,8 +831,8 @@ function buildAlerts(sensorData, thresholds, maxWaterDist, tankFullDist) {
     minAirHum = 50,
     maxLux    = 20000,
   } = thresholds || {};
-  const maxWD = maxWaterDist ?? DEFAULT_MAX_WATER_DIST;
-  const fullD = tankFullDist ?? DEFAULT_TANK_FULL_DIST;
+  const maxWD = maxWaterDist;
+  const fullD = tankFullDist;
 
   const alerts = [];
 
@@ -991,8 +986,8 @@ export default function DashboardScreen() {
   const { sensorData, history, setHistory } = useMqtt();
   const [refreshing,    setRefreshing]    = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [maxWaterDist,  setMaxWaterDist]  = useState(DEFAULT_MAX_WATER_DIST);
-  const [tankFullDist,  setTankFullDist]  = useState(DEFAULT_TANK_FULL_DIST);
+  const [maxWaterDist,  setMaxWaterDist]  = useState(null);
+  const [tankFullDist,  setTankFullDist]  = useState(null);
   const [waterTankCalibrated, setWaterTankCalibrated] = useState(false);
   const [todayEntries, setTodayEntries] = useState([]);
   const [yesterdayEntries, setYesterdayEntries] = useState([]);

@@ -8,23 +8,29 @@ import {
   getDateKeys,
 } from '../utils/sensorHistory';
 import { firebaseService } from '../services/firebaseService';
-import { DEFAULT_TANK_FULL_DISTANCE, waterDistanceToPercent } from '../utils/waterLevel';
+import { isWaterTankCalibrated, waterDistanceToPercent } from '../utils/waterLevel';
 
 function readMaxWaterDistance() {
+  if (!isWaterTankCalibrated()) return null;
   try {
     const v = localStorage.getItem('iot_max_water_distance');
-    return v ? Number(v) : 20;
+    if (v == null || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
   } catch {
-    return 20;
+    return null;
   }
 }
 
 function readTankFullDistance() {
+  if (!isWaterTankCalibrated()) return null;
   try {
     const v = localStorage.getItem('iot_tank_full_distance');
-    return v ? Number(v) : DEFAULT_TANK_FULL_DISTANCE;
+    if (v == null || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : null;
   } catch {
-    return DEFAULT_TANK_FULL_DISTANCE;
+    return null;
   }
 }
 

@@ -76,7 +76,7 @@ function hasAnyData(data, keys) {
   return data.some((row) => keys.some((k) => row[k] != null));
 }
 
-export default function GardenCharts({ chartData, loading, maxWaterDistance = 20, tankFullDistance = 2 }) {
+export default function GardenCharts({ chartData, loading, maxWaterDistance, tankFullDistance }) {
   const tempStats = useMemo(() => seriesMinMax(chartData, 'nhiet_do'), [chartData]);
   const soilStats = useMemo(() => seriesMinMax(chartData, 'do_am_dat'), [chartData]);
   const waterStats = useMemo(() => seriesMinMax(chartData, 'muc_nuoc'), [chartData]);

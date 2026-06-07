@@ -8,7 +8,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { firebaseService } from '../services/firebaseService';
 import { normalizeSensorPayload } from '../utils/normalizeSensor';
 import WeatherDayChart from './WeatherDayChart';
-import { DEFAULT_TANK_FULL_DISTANCE, waterDistanceToPercent } from '../utils/waterLevel';
+import { DEFAULT_TANK_FULL_DISTANCE, WATER_CALIBRATION_KEY, waterDistanceToPercent } from '../utils/waterLevel';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 const VN_WEEKDAY = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
 const VN_DAY_SHORT = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
@@ -112,7 +112,7 @@ function normRaw(raw) {
   return { ts: toMs(raw.ts || raw.timestamp), ...n };
 }
 
-const DEFAULT_MAX_WATER_DIST = 20;
+
 const DEFAULT_TANK_FULL_DIST = DEFAULT_TANK_FULL_DISTANCE;
 
 function toSensorDisplayValue(val, sensorKey, maxWaterDist, tankFullDist) {
@@ -123,7 +123,7 @@ function toSensorDisplayValue(val, sensorKey, maxWaterDist, tankFullDist) {
   return val;
 }
 
-function dayAvg(entries, sensorKey, maxWaterDist = DEFAULT_MAX_WATER_DIST, tankFullDist = DEFAULT_TANK_FULL_DIST) {
+function dayAvg(entries, sensorKey, maxWaterDist, tankFullDist) {
   const vals = entries
     .map((e) => toSensorDisplayValue(safeNum(e[sensorKey]), sensorKey, maxWaterDist, tankFullDist))
     .filter((v) => v != null);
@@ -131,7 +131,7 @@ function dayAvg(entries, sensorKey, maxWaterDist = DEFAULT_MAX_WATER_DIST, tankF
   return Math.round(vals.reduce((s, v) => s + v, 0) / vals.length * 10) / 10;
 }
 
-function dayMinMax(entries, sensorKey, maxWaterDist = DEFAULT_MAX_WATER_DIST, tankFullDist = DEFAULT_TANK_FULL_DIST) {
+function dayMinMax(entries, sensorKey, maxWaterDist, tankFullDist) {
   const vals = entries
     .map((e) => toSensorDisplayValue(safeNum(e[sensorKey]), sensorKey, maxWaterDist, tankFullDist))
     .filter((v) => v != null);
@@ -277,15 +277,17 @@ export default function HistoryDetailSheet({
   );
   const [loading, setLoading] = useState(true);
   const [multiDayData, setMultiDayData] = useState({});
-  const [maxWaterDist, setMaxWaterDist] = useState(DEFAULT_MAX_WATER_DIST);
-  const [tankFullDist, setTankFullDist] = useState(DEFAULT_TANK_FULL_DIST);
+  const [maxWaterDist, setMaxWaterDist] = useState(null);
+  const [tankFullDist, setTankFullDist] = useState(null);
 
   useEffect(() => {
     Promise.all([
+      AsyncStorage.getItem(WATER_CALIBRATION_KEY),
       AsyncStorage.getItem('iot_max_water_distance'),
       AsyncStorage.getItem('iot_tank_full_distance'),
     ])
-      .then(([emptyV, fullV]) => {
+      .then(([calibV, emptyV, fullV]) => {
+        if (calibV !== 'true') return;
         if (emptyV) setMaxWaterDist(Number(emptyV));
         if (fullV) setTankFullDist(Number(fullV));
       })

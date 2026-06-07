@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import AppIcon, { IconHeading } from './AppIcon';
 import {
   formatCmForInput,
@@ -107,24 +107,34 @@ function ConfigPage({
   const [presetFieldErrors, setPresetFieldErrors] = useState({});
   const [confirmState, setConfirmState] = useState(null);
   const [tankUnit, setTankUnit] = useState(loadTankDistanceUnit);
-  const [draftEmptyCm, setDraftEmptyCm] = useState(maxWaterDistance ?? 20);
-  const [draftFullCm, setDraftFullCm] = useState(tankFullDistance ?? 2);
-  const [emptyText, setEmptyText] = useState(() => formatCmForInput(maxWaterDistance ?? 20, loadTankDistanceUnit()));
-  const [fullText, setFullText] = useState(() => formatCmForInput(tankFullDistance ?? 2, loadTankDistanceUnit()));
+  const [draftEmptyCm, setDraftEmptyCm] = useState(maxWaterDistance ?? null);
+  const [draftFullCm, setDraftFullCm] = useState(tankFullDistance ?? null);
+  const [emptyText, setEmptyText] = useState(() => (
+    maxWaterDistance != null ? formatCmForInput(maxWaterDistance, loadTankDistanceUnit()) : ''
+  ));
+  const [fullText, setFullText] = useState(() => (
+    tankFullDistance != null ? formatCmForInput(tankFullDistance, loadTankDistanceUnit()) : ''
+  ));
   const [savingTank, setSavingTank] = useState(false);
+  const tankUnitRef = useRef(tankUnit);
+  tankUnitRef.current = tankUnit;
 
   useEffect(() => {
-    setDraftEmptyCm(maxWaterDistance ?? 20);
-    setDraftFullCm(tankFullDistance ?? 2);
-    setEmptyText(formatCmForInput(maxWaterDistance ?? 20, tankUnit));
-    setFullText(formatCmForInput(tankFullDistance ?? 2, tankUnit));
+    setDraftEmptyCm(maxWaterDistance ?? null);
+    setDraftFullCm(tankFullDistance ?? null);
+    setEmptyText(
+      maxWaterDistance != null ? formatCmForInput(maxWaterDistance, tankUnitRef.current) : '',
+    );
+    setFullText(
+      tankFullDistance != null ? formatCmForInput(tankFullDistance, tankUnitRef.current) : '',
+    );
   }, [maxWaterDistance, tankFullDistance]);
 
   const hasUnsavedTank = !tankConfigEqual(
     draftEmptyCm,
     draftFullCm,
-    maxWaterDistance ?? 20,
-    tankFullDistance ?? 2,
+    maxWaterDistance,
+    tankFullDistance,
   );
 
   const handleTankUnitChange = (unit) => {
@@ -766,6 +776,7 @@ function ConfigPage({
                   value={emptyText}
                   onChange={(e) => handleEmptyInput(e.target.value)}
                   disabled={!canEdit}
+                  placeholder="Chưa cấu hình"
                 />
                 <span className="water-tank-unit">{tankUnit}</span>
               </div>
@@ -788,6 +799,7 @@ function ConfigPage({
                   value={fullText}
                   onChange={(e) => handleFullInput(e.target.value)}
                   disabled={!canEdit}
+                  placeholder="Chưa cấu hình"
                 />
                 <span className="water-tank-unit">{tankUnit}</span>
               </div>

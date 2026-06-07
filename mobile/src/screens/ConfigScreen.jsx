@@ -31,8 +31,6 @@ const DEFAULT_CONFIG = {
   maxLux:  20000,
 };
 
-const DEFAULT_MAX_WATER_DISTANCE = 20;
-
 const FIELDS = [
   { key: 'minSoil',    label: 'Độ ẩm đất tối thiểu', unit: '%' },
   { key: 'targetSoil', label: 'Độ ẩm đất mục tiêu',  unit: '%' },
@@ -248,12 +246,12 @@ export default function ConfigScreen() {
   const [tab, setTab]                 = useState('custom');     // 'custom' | 'preset'
   const [deployed, setDeployed]       = useState(DEFAULT_CONFIG);
   const [draft, setDraft]             = useState(DEFAULT_CONFIG);
-  const [maxWaterDist, setMaxWaterDist] = useState(DEFAULT_MAX_WATER_DISTANCE);
-  const [tankFullDist, setTankFullDist] = useState(DEFAULT_TANK_FULL_DISTANCE);
+  const [maxWaterDist, setMaxWaterDist] = useState(null);
+  const [tankFullDist, setTankFullDist] = useState(null);
   const [waterTankCalibrated, setWaterTankCalibrated] = useState(false);
   const [tankUnit, setTankUnit] = useState('cm');
-  const [draftEmptyCm, setDraftEmptyCm] = useState(DEFAULT_MAX_WATER_DISTANCE);
-  const [draftFullCm, setDraftFullCm] = useState(DEFAULT_TANK_FULL_DISTANCE);
+  const [draftEmptyCm, setDraftEmptyCm] = useState(null);
+  const [draftFullCm, setDraftFullCm] = useState(null);
   const [emptyText, setEmptyText] = useState('');
   const [fullText, setFullText] = useState('');
   const [savingTank, setSavingTank] = useState(false);
@@ -397,15 +395,21 @@ export default function ConfigScreen() {
         ]);
         const unit = loadTankDistanceUnit(AsyncStorage);
         setTankUnit(unit);
-        const emptyCm = emptyV ? Number(emptyV) : DEFAULT_MAX_WATER_DISTANCE;
-        const fullCm = fullV ? Number(fullV) : DEFAULT_TANK_FULL_DISTANCE;
-        setMaxWaterDist(emptyCm);
-        setTankFullDist(fullCm);
-        setDraftEmptyCm(emptyCm);
-        setDraftFullCm(fullCm);
-        setEmptyText(formatCmForInput(emptyCm, unit));
-        setFullText(formatCmForInput(fullCm, unit));
-        if (calibV === 'true') setWaterTankCalibrated(true);
+        if (calibV === 'true') {
+          setWaterTankCalibrated(true);
+          const emptyCm = emptyV != null && emptyV !== '' ? Number(emptyV) : null;
+          const fullCm = fullV != null && fullV !== '' ? Number(fullV) : null;
+          if (emptyCm != null && emptyCm > 0) {
+            setMaxWaterDist(emptyCm);
+            setDraftEmptyCm(emptyCm);
+            setEmptyText(formatCmForInput(emptyCm, unit));
+          }
+          if (fullCm != null && fullCm >= 0) {
+            setTankFullDist(fullCm);
+            setDraftFullCm(fullCm);
+            setFullText(formatCmForInput(fullCm, unit));
+          }
+        }
       } catch {}
     })();
   }, []);

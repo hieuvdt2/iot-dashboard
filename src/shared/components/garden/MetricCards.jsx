@@ -78,7 +78,7 @@ export default function MetricCards({
   hourlyRaw,
   thresholds,
   maxWaterDistance,
-  tankFullDistance = 2,
+  tankFullDistance,
 }) {
   const temp = sensorData?.nhiet_do ?? null;
   const soil = sensorData?.do_am_dat ?? null;

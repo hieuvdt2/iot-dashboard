@@ -47,7 +47,19 @@ export function formatDistanceLabel(cm, unit = 'cm') {
   return `${Number(cm)} cm`;
 }
 
+export function isTankCalibrationReady(tankEmptyDistance, tankFullDistance) {
+  const empty = Number(tankEmptyDistance);
+  const full = Number(tankFullDistance);
+  return Number.isFinite(empty) && empty > 0 && Number.isFinite(full) && full >= 0 && empty > full;
+}
+
 export function tankConfigEqual(aEmpty, aFull, bEmpty, bFull, epsilon = 0.001) {
+  const aEmptyNull = aEmpty == null || !Number.isFinite(Number(aEmpty));
+  const aFullNull = aFull == null || !Number.isFinite(Number(aFull));
+  const bEmptyNull = bEmpty == null || !Number.isFinite(Number(bEmpty));
+  const bFullNull = bFull == null || !Number.isFinite(Number(bFull));
+  if (aEmptyNull && aFullNull && bEmptyNull && bFullNull) return true;
+  if (aEmptyNull !== bEmptyNull || aFullNull !== bFullNull) return false;
   return (
     Math.abs(Number(aEmpty) - Number(bEmpty)) < epsilon
     && Math.abs(Number(aFull) - Number(bFull)) < epsilon
@@ -62,6 +74,30 @@ export function isWaterTankCalibrated() {
   }
 }
 
+function readStoredNumber(key) {
+  try {
+    const v = localStorage.getItem(key);
+    if (v == null || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Đọc hiệu chuẩn bể đã lưu — null nếu chưa cấu hình (không dùng số mặc định). */
+export function loadStoredTankEmptyDistance() {
+  if (!isWaterTankCalibrated()) return null;
+  const n = readStoredNumber('iot_max_water_distance');
+  return n != null && n > 0 ? n : null;
+}
+
+export function loadStoredTankFullDistance() {
+  if (!isWaterTankCalibrated()) return null;
+  const n = readStoredNumber('iot_tank_full_distance');
+  return n != null && n >= 0 ? n : null;
+}
+
 export function markWaterTankCalibrated() {
   try {
     localStorage.setItem(WATER_CALIBRATION_KEY, 'true');
@@ -70,15 +106,11 @@ export function markWaterTankCalibrated() {
   }
 }
 
-export function waterDistanceToPercent(
-  distance,
-  tankEmptyDistance = 20,
-  tankFullDistance = DEFAULT_TANK_FULL_DISTANCE,
-) {
+export function waterDistanceToPercent(distance, tankEmptyDistance, tankFullDistance) {
   if (distance == null || !Number.isFinite(Number(distance))) return null;
+  if (!isTankCalibrationReady(tankEmptyDistance, tankFullDistance)) return null;
   const empty = Number(tankEmptyDistance);
   const full = Number(tankFullDistance);
-  if (!empty || empty <= full) return null;
   const span = empty - full;
   const pct = ((empty - Number(distance)) / span) * 100;
   return Math.min(100, Math.max(0, Math.round(pct)));
@@ -89,7 +121,7 @@ export function formatWaterPercent(distance, tankEmptyDistance, tankFullDistance
   return pct == null ? fallback : `${pct}%`;
 }
 
-export function getWaterLevelStatus(distance, tankEmptyDistance, tankFullDistance = DEFAULT_TANK_FULL_DISTANCE) {
+export function getWaterLevelStatus(distance, tankEmptyDistance, tankFullDistance) {
   const pct = waterDistanceToPercent(distance, tankEmptyDistance, tankFullDistance);
   if (pct == null) return null;
   if (pct <= 5 || distance > tankEmptyDistance) return { key: 'empty', label: 'Cạn', cls: 'danger' };
@@ -98,8 +130,8 @@ export function getWaterLevelStatus(distance, tankEmptyDistance, tankFullDistanc
   return { key: 'full', label: 'Đủ nước', cls: 'ok' };
 }
 
-export function waterTrendAsPercent(trend, tankEmptyDistance, tankFullDistance = DEFAULT_TANK_FULL_DISTANCE) {
-  if (!trend || !tankEmptyDistance) return trend;
+export function waterTrendAsPercent(trend, tankEmptyDistance, tankFullDistance) {
+  if (!trend || !isTankCalibrationReady(tankEmptyDistance, tankFullDistance)) return trend;
   const span = Number(tankEmptyDistance) - Number(tankFullDistance);
   if (span <= 0) return trend;
   const pctDiff = Math.round(-(trend.diff / span) * 100);
@@ -116,11 +148,12 @@ export function waterTrendAsPercent(trend, tankEmptyDistance, tankFullDistance =
 
 /** Payload MQTT/ESP32 — luôn gửi maxWaterDistance cho Arduino. */
 export function buildMqttConfigPayload(thresholds, tankEmptyDistance, tankFullDistance) {
-  return {
-    ...thresholds,
-    maxWaterDistance: tankEmptyDistance,
-    tankFullDistance: tankFullDistance,
-  };
+  const payload = { ...thresholds };
+  if (isTankCalibrationReady(tankEmptyDistance, tankFullDistance)) {
+    payload.maxWaterDistance = tankEmptyDistance;
+    payload.tankFullDistance = tankFullDistance;
+  }
+  return payload;
 }
 
 /**
@@ -134,7 +167,7 @@ export function buildFirebaseConfigPayload(
   tankCalibrated = false,
 ) {
   const payload = { ...thresholds };
-  if (tankCalibrated) {
+  if (tankCalibrated && isTankCalibrationReady(tankEmptyDistance, tankFullDistance)) {
     payload.maxWaterDistance = tankEmptyDistance;
     payload.tankFullDistance = tankFullDistance;
     payload.tankCalibrated = true;

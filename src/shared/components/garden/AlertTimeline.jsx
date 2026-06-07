@@ -9,7 +9,7 @@ function extractTime(timeStr) {
   return timeStr;
 }
 
-function buildFromHistory(history, thresholds, maxWaterDistance, tankFullDistance = 2) {
+function buildFromHistory(history, thresholds, maxWaterDistance, tankFullDistance) {
   const events = [];
   const { minSoil = 35, maxTemp = 35, minAirHum = 50 } = thresholds;
 
@@ -78,8 +78,8 @@ export function useAlertTimeline({
   pumpStatus,
   pumpStatusLabel,
   thresholds = {},
-  maxWaterDistance = 20,
-  tankFullDistance = 2,
+  maxWaterDistance,
+  tankFullDistance,
 }) {
   return useMemo(() => {
     const fromAlerts = buildFromAlerts(alerts || []);

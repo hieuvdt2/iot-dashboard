@@ -19,8 +19,8 @@ function DashboardPage({
   pumpStatusLabel,
   history,
   thresholds = {},
-  maxWaterDistance = 20,
-  tankFullDistance = 2,
+  maxWaterDistance,
+  tankFullDistance,
 }) {
   const { chartData, hourlyRaw, loading, lastSync } = useGardenChartData(
     sensorData?.time ?? 0,

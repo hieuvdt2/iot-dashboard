@@ -46,7 +46,7 @@ const SENSOR_CONFIG = [
   },
 ];
 
-function SensorCard({ sensorData, connected, maxWaterDistance = 20, tankFullDistance = 2 }) {
+function SensorCard({ sensorData, connected, maxWaterDistance, tankFullDistance }) {
   return (
     <div className="sensor-cards">
       {SENSOR_CONFIG.map((sensor) => {
