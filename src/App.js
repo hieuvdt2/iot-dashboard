@@ -21,6 +21,7 @@ import {
 import {
   buildEnvironmentAlerts,
 } from './shared/utils/environmentAlerts';
+import { formatLightLabel } from './shared/utils/lightDisplay';
 import {
   DEFAULT_TANK_FULL_DISTANCE,
   buildFirebaseConfigPayload,
@@ -775,7 +776,7 @@ function App() {
       nhietDo: sensorData.nhiet_do ?? '--',
       doAmKhongKhi: sensorData.do_am_khong_khi ?? '--',
       doAmDat: sensorData.do_am_dat ?? '--',
-      anhSang: sensorData.anh_sang ?? '--',
+      anhSang: sensorData?.anh_sang != null ? formatLightLabel(sensorData.anh_sang) : '--',
       mucNuoc: sensorData.muc_nuoc ?? '--',
       thoiGian: sensorData.time ?? '--',
     });

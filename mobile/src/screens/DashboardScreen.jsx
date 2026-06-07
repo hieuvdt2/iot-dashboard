@@ -12,6 +12,11 @@ import HistoryDetailSheet from '../components/HistoryDetailSheet';
 import WeatherDayChart from '../components/WeatherDayChart';
 import WateringStatusBar from '../components/WateringStatusBar';
 import { hourly24Filled, sliceHourlyWindow, seriesMinMax, safeNum as chartSafeNum } from '../utils/dayChart';
+import {
+  formatLightLabel,
+  formatLightCondition,
+  lightLevelMeta,
+} from '../utils/lightDisplay';
 import { waterDistanceToPercent } from '../utils/waterLevel';
 import { useTankCalibration } from '../hooks/useTankCalibration';
 
@@ -140,18 +145,12 @@ function HeroCard({ sensorData, pumpState, autoMode, maxWaterDist, tankFullDist 
   const dateStr = `${VN_WEEKDAY[now.getDay()]}, ${String(now.getDate()).padStart(2,'0')} Tháng ${now.getMonth()+1} ${now.getFullYear()}`;
 
   // Condition (right of date, like "Bright and Sunny")
+  const lightMeta = light != null ? lightLevelMeta(light) : null;
   const condIcon = light == null ? { lib: 'ion', name: 'cloud-outline' }
-    : light < 200   ? { lib: 'ion', name: 'moon-outline' }
-    : light < 1000  ? { lib: 'ion', name: 'partly-sunny-outline' }
-    : light < 5000  ? { lib: 'ion', name: 'partly-sunny-outline' }
-    : light < 15000 ? { lib: 'ion', name: 'sunny-outline' }
-    : { lib: 'ion', name: 'sunny' };
-  const condText = light == null    ? 'Đang đo...'
-    : light < 200   ? 'Trong nhà / tối'
-    : light < 1000  ? 'Ánh sáng yếu'
-    : light < 5000  ? 'Ánh sáng vừa'
-    : light < 15000 ? 'Ánh sáng tốt'
-    : 'Nắng mạnh';
+    : lightMeta?.label === 'Sáng' ? { lib: 'ion', name: 'sunny-outline' }
+    : lightMeta?.label === 'Tối' ? { lib: 'ion', name: 'moon-outline' }
+    : { lib: 'ion', name: 'partly-sunny-outline' };
+  const condText = formatLightCondition(light);
 
   // Plant health badge — solid background like the image
   const badge = soil == null
@@ -171,8 +170,8 @@ function HeroCard({ sensorData, pumpState, autoMode, maxWaterDist, tankFullDist 
     { lib: 'mci', icon: 'sprout',        label: 'Độ ẩm đất',
       num: soil  != null ? Math.round(soil)  : '--', unit: soil  != null ? '%'    : '' },
     { lib: 'ion', icon: 'sunny-outline', label: 'Ánh sáng',
-      num: light != null ? (light >= 1000 ? `${(light/1000).toFixed(1)}k` : Math.round(light)) : '--',
-      unit: light != null ? 'lux' : '' },
+      num: light != null ? formatLightLabel(light) : '--',
+      unit: '' },
     { lib: 'ion', icon: 'water-outline', label: 'Độ ẩm KK',
       num: air   != null ? Math.round(air)   : '--', unit: air   != null ? '% RH' : '' },
   ];
@@ -409,15 +408,13 @@ const HOURLY_SENSORS = [
   { key: 'temperature', label: 'Nhiệt độ', lib: 'mci', icon: 'thermometer',       unit: '°',    color: '#ef4444' },
   { key: 'soilHum',     label: 'Đ.A đất',  lib: 'mci', icon: 'sprout',            unit: '%',    color: '#22c55e' },
   { key: 'airHum',      label: 'Đ.A KK',   lib: 'ion', icon: 'water-outline',     unit: '%',    color: '#3b82f6' },
-  { key: 'light',       label: 'Ánh sáng', lib: 'ion', icon: 'sunny-outline',     unit: ' lux', color: '#f59e0b' },
+  { key: 'light',       label: 'Ánh sáng', lib: 'ion', icon: 'sunny-outline',     unit: '',    color: '#f59e0b' },
 ];
 
 function formatLiveReading(sensorKey, value) {
   const n = chartSafeNum(value);
   if (n == null) return '--';
-  if (sensorKey === 'light') {
-    return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n));
-  }
+  if (sensorKey === 'light') return formatLightLabel(n);
   return String(Math.round(n * 10) / 10);
 }
 
@@ -724,12 +721,7 @@ function DetailCards({ sensorData, dailyData, maxWaterDist, tankFullDist, pumpSt
     : soil < 75 ? { emoji: '🟢', text: 'Đất đủ ẩm\nchưa cần tưới',   color: '#4ade80' }
     :             { emoji: '🔵', text: 'Đất quá ướt\ntạm dừng tưới',  color: '#60a5fa' };
 
-  const lightLevel = light == null ? null
-    : light < 200   ? { label: 'Rất tối',       pct: 4,  color: '#818cf8' }
-    : light < 1000  ? { label: 'Ánh sáng yếu',  pct: 20, color: '#a78bfa' }
-    : light < 5000  ? { label: 'Ánh sáng vừa',  pct: 45, color: '#fbbf24' }
-    : light < 15000 ? { label: 'Ánh sáng tốt',  pct: 70, color: '#fb923c' }
-    :                 { label: 'Rất sáng',       pct: 94, color: '#fef3c7' };
+  const lightLevel = light != null ? lightLevelMeta(light) : null;
 
   const airStatus = air == null ? null
     : air < 40 ? 'Không khí khô ráo'
@@ -782,9 +774,9 @@ function DetailCards({ sensorData, dailyData, maxWaterDist, tankFullDist, pumpSt
         <View style={[dcs.card, { width: HALF }]}>
           <View style={dcs.labelRow}><Ionicons name="sunny-outline" size={13} color={TEXT_DIM} /><Text style={dcs.label}> ÁNH SÁNG</Text></View>
           <Text style={dcs.bigNum}>
-            {light != null ? (light > 999 ? `${(light / 1000).toFixed(1)}k` : `${Math.round(light)}`) : '--'}
+            {light != null ? formatLightLabel(light) : '--'}
           </Text>
-          <Text style={[dcs.sub, { marginBottom: 10 }]}>lux</Text>
+          <Text style={[dcs.sub, { marginBottom: 10 }]}>trạng thái</Text>
           {lightLevel && (
             <>
               {/* Gradient scale bar */}
@@ -920,7 +912,7 @@ function SensorRow({ sensorData }) {
     { icon: '🌡️', label: 'Nhiệt độ', value: sensorData?.temperature, unit: '°C' },
     { icon: '🌱', label: 'Đ.A Đất',   value: sensorData?.soilHum,     unit: '%' },
     { icon: '💧', label: 'Đ.A KK',    value: sensorData?.airHum,      unit: '%' },
-    { icon: '☀️', label: 'Ánh sáng',  value: sensorData?.light,       unit: 'lux' },
+    { icon: '☀️', label: 'Ánh sáng',  value: sensorData?.light != null ? formatLightLabel(sensorData.light) : null, unit: '' },
   ];
 
   return (
@@ -997,11 +989,10 @@ function buildAlerts(sensorData, thresholds, maxWaterDist, tankFullDist) {
 
   const light = sensorData.light;
   if (typeof light === 'number' && light > maxLux) {
-    const lbl = light >= 1000 ? `${(light / 1000).toFixed(1)}k` : `${Math.round(light)}`;
     alerts.push({
       id: 'light-high', icon: '☀️', severity: light > maxLux * 1.2 ? 'danger' : 'warning',
       title: 'Ánh sáng quá mạnh',
-      body: `Cường độ sáng ${lbl} lux vượt ngưỡng ${(maxLux / 1000).toFixed(0)}k lux. Che bớt ánh nắng trực tiếp.`,
+      body: `Trạng thái ${formatLightLabel(light)} vượt ngưỡng cấu hình. Che bớt ánh nắng trực tiếp.`,
     });
   }
 
