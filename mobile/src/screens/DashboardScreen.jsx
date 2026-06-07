@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   RefreshControl, ActivityIndicator, SafeAreaView,
@@ -10,6 +10,7 @@ import { useMqtt } from '../MqttContext';
 import { firebaseService } from '../services/firebaseService';
 import HistoryDetailSheet from '../components/HistoryDetailSheet';
 import WeatherDayChart from '../components/WeatherDayChart';
+import { buildFirebaseConfigPayload, DEFAULT_TANK_FULL_DISTANCE, splitDeviceConfig, WATER_CALIBRATION_KEY, waterDistanceToPercent } from '../utils/waterLevel';
 
 /* ── Icon helper ─────────────────────────────────────────────────────────── */
 function Icon({ lib = 'ion', name, size = 18, color = '#4a7a5a' }) {
@@ -31,6 +32,7 @@ const TEXT_WHITE  = TEXT_DARK;
 const TEXT_DIM    = TEXT_MED;
 
 const DEFAULT_MAX_WATER_DIST = 20;
+const DEFAULT_TANK_FULL_DIST = DEFAULT_TANK_FULL_DISTANCE;
 
 const VN_DAY = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
@@ -101,14 +103,15 @@ function aggDay(entries) {
 
 const VN_WEEKDAY = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
 
-function HeroCard({ sensorData, pumpState, autoMode, maxWaterDist }) {
+function HeroCard({ sensorData, pumpState, autoMode, maxWaterDist, tankFullDist }) {
   const temp  = sensorData?.temperature ?? null;
   const soil  = sensorData?.soilHum     ?? null;
   const air   = sensorData?.airHum      ?? null;
   const light = sensorData?.light       ?? null;
   const wDist = sensorData?.waterLevel  ?? null;
   const maxD  = maxWaterDist ?? DEFAULT_MAX_WATER_DIST;
-  const wPct  = wDist != null ? Math.max(0, Math.min(100, Math.round((1 - wDist / maxD) * 100))) : null;
+  const fullD = tankFullDist ?? DEFAULT_TANK_FULL_DIST;
+  const wPct  = waterDistanceToPercent(wDist, maxD, fullD);
 
   // Date: "Thứ năm, 05 Tháng 6 2026"
   const now     = new Date();
@@ -545,13 +548,14 @@ const dl = StyleSheet.create({
 
 /* ── Water Card ───────────────────────────────────────────────────────────── */
 
-function WaterCard({ sensorData, maxWaterDist }) {
+function WaterCard({ sensorData, maxWaterDist, tankFullDist }) {
   const wDist = sensorData?.waterLevel ?? null;
   const maxD  = maxWaterDist ?? DEFAULT_MAX_WATER_DIST;
-  const pct   = wDist != null ? Math.max(0, Math.min(100, Math.round((1 - wDist / maxD) * 100))) : null;
-  const status = wDist == null ? null
-    : wDist <= maxD * 0.5 ? { label: '✓ Đủ nước',   color: '#4ade80' }
-    : wDist <= maxD       ? { label: '⚠ Nước thấp', color: '#fbbf24' }
+  const fullD = tankFullDist ?? DEFAULT_TANK_FULL_DIST;
+  const pct   = waterDistanceToPercent(wDist, maxD, fullD);
+  const status = wDist == null || pct == null ? null
+    : pct >= 55 ? { label: '✓ Đủ nước',   color: '#4ade80' }
+    : pct >= 30 ? { label: '⚠ Nước thấp', color: '#fbbf24' }
     : { label: '✗ Hết nước', color: '#f87171' };
 
   if (pct == null) return null;
@@ -571,7 +575,7 @@ function WaterCard({ sensorData, maxWaterDist }) {
             <View style={[wc.fill, { width: `${pct}%`, backgroundColor: barColor }]} />
           </View>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 5 }}>
-            <Text style={wc.sub}>{wDist != null ? `${wDist.toFixed(0)} cm` : '--'}</Text>
+            <Text style={wc.sub}>Quy đổi từ muc_nuoc</Text>
             <Text style={[wc.pct, { color: barColor }]}>{pct}%</Text>
           </View>
         </View>
@@ -592,14 +596,15 @@ const wc = StyleSheet.create({
 
 /* ── Detail Cards (2-col grid, weather-app style) ────────────────────────── */
 
-function DetailCards({ sensorData, dailyData, maxWaterDist }) {
+function DetailCards({ sensorData, dailyData, maxWaterDist, tankFullDist }) {
   const temp  = sensorData?.temperature ?? null;
   const soil  = sensorData?.soilHum     ?? null;
   const air   = sensorData?.airHum      ?? null;
   const light = sensorData?.light       ?? null;
   const wDist = sensorData?.waterLevel  ?? null;
   const maxD  = maxWaterDist ?? DEFAULT_MAX_WATER_DIST;
-  const wPct  = wDist != null ? Math.max(0, Math.min(100, Math.round((1 - wDist / maxD) * 100))) : null;
+  const fullD = tankFullDist ?? DEFAULT_TANK_FULL_DIST;
+  const wPct  = waterDistanceToPercent(wDist, maxD, fullD);
 
   const avg30 = useMemo(() => {
     if (!dailyData.length) return {};
@@ -717,7 +722,6 @@ function DetailCards({ sensorData, dailyData, maxWaterDist }) {
         <View style={[dcs.card, { marginBottom: 8 }]}>
           <View style={dcs.labelRow}><MaterialCommunityIcons name="water-pump" size={13} color={TEXT_DIM} /><Text style={dcs.label}> MỰC NƯỚC BỂ</Text></View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18 }}>
-            {/* Ring gauge */}
             <View style={{ width: 78, height: 78, alignItems: 'center', justifyContent: 'center' }}>
               <View style={[dcs.ring, { borderColor: '#ddeee5' }]} />
               <View style={[dcs.ring, {
@@ -824,7 +828,7 @@ const sr = StyleSheet.create({
 
 /* ── Alert Strip ───────────────────────────────────────────────────────────── */
 
-function buildAlerts(sensorData, thresholds, maxWaterDist) {
+function buildAlerts(sensorData, thresholds, maxWaterDist, tankFullDist) {
   if (!sensorData) return [];
   const {
     minSoil   = 35,
@@ -833,6 +837,7 @@ function buildAlerts(sensorData, thresholds, maxWaterDist) {
     maxLux    = 20000,
   } = thresholds || {};
   const maxWD = maxWaterDist ?? DEFAULT_MAX_WATER_DIST;
+  const fullD = tankFullDist ?? DEFAULT_TANK_FULL_DIST;
 
   const alerts = [];
 
@@ -878,8 +883,8 @@ function buildAlerts(sensorData, thresholds, maxWaterDist) {
 
   const wDist = sensorData.waterLevel;
   if (typeof wDist === 'number') {
-    const pct = Math.max(0, Math.min(100, Math.round((1 - wDist / maxWD) * 100)));
-    if (pct < 20) {
+    const pct = waterDistanceToPercent(wDist, maxWD, fullD);
+    if (pct != null && pct < 20) {
       alerts.push({
         id: 'water-low', icon: '🪣', severity: pct < 10 ? 'danger' : 'warning',
         title: 'Mực nước bể thấp',
@@ -896,7 +901,7 @@ const ALERT_COLORS = {
   warning: { bg: '#fffbeb', border: '#fde68a', dot: '#f59e0b' },
 };
 
-function AlertStrip({ sensorData, maxWaterDist }) {
+function AlertStrip({ sensorData, maxWaterDist, tankFullDist }) {
   const [thresholds, setThresholds] = useState(null);
 
   useEffect(() => {
@@ -912,8 +917,8 @@ function AlertStrip({ sensorData, maxWaterDist }) {
   }, []);
 
   const alerts = useMemo(
-    () => buildAlerts(sensorData, thresholds, maxWaterDist),
-    [sensorData, thresholds, maxWaterDist],
+    () => buildAlerts(sensorData, thresholds, maxWaterDist, tankFullDist),
+    [sensorData, thresholds, maxWaterDist, tankFullDist],
   );
 
   if (!alerts.length) {
@@ -987,20 +992,67 @@ export default function DashboardScreen() {
   const [refreshing,    setRefreshing]    = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [maxWaterDist,  setMaxWaterDist]  = useState(DEFAULT_MAX_WATER_DIST);
+  const [tankFullDist,  setTankFullDist]  = useState(DEFAULT_TANK_FULL_DIST);
+  const [waterTankCalibrated, setWaterTankCalibrated] = useState(false);
   const [todayEntries, setTodayEntries] = useState([]);
   const [yesterdayEntries, setYesterdayEntries] = useState([]);
   const [dailyData,     setDailyData]     = useState([]);
   const [historyDetail, setHistoryDetail] = useState(null);
+  const tankMigrateRef = useRef(false);
 
-  // Load maxWaterDistance from storage
+  // Hiệu chuẩn bể: AsyncStorage giữ giá trị local; Firebase chỉ ghi đè khi tankCalibrated=true
   useEffect(() => {
     (async () => {
       try {
         const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-        const v = await AsyncStorage.getItem('iot_max_water_distance');
-        if (v) setMaxWaterDist(Number(v));
+        const [emptyV, fullV, calibV] = await Promise.all([
+          AsyncStorage.getItem('iot_max_water_distance'),
+          AsyncStorage.getItem('iot_tank_full_distance'),
+          AsyncStorage.getItem(WATER_CALIBRATION_KEY),
+        ]);
+        if (emptyV) setMaxWaterDist(Number(emptyV));
+        if (fullV) setTankFullDist(Number(fullV));
+        if (calibV === 'true') setWaterTankCalibrated(true);
       } catch {}
     })();
+
+    const unsub = firebaseService.subscribeConfig(async (cfg) => {
+      const { thresholds, tankEmpty, tankFull, tankCalibrated } = splitDeviceConfig(cfg);
+      if (tankCalibrated) {
+        try {
+          const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+          if (tankEmpty != null && tankEmpty > 0) {
+            setMaxWaterDist(tankEmpty);
+            await AsyncStorage.setItem('iot_max_water_distance', String(tankEmpty));
+          }
+          if (tankFull != null && tankFull >= 0) {
+            setTankFullDist(tankFull);
+            await AsyncStorage.setItem('iot_tank_full_distance', String(tankFull));
+          }
+          setWaterTankCalibrated(true);
+          await AsyncStorage.setItem(WATER_CALIBRATION_KEY, 'true');
+        } catch {}
+        return;
+      }
+
+      if (tankMigrateRef.current) return;
+      try {
+        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+        const calibV = await AsyncStorage.getItem(WATER_CALIBRATION_KEY);
+        if (calibV !== 'true') return;
+        const emptyV = await AsyncStorage.getItem('iot_max_water_distance');
+        const fullV = await AsyncStorage.getItem('iot_tank_full_distance');
+        const empty = emptyV ? Number(emptyV) : 0;
+        const full = fullV ? Number(fullV) : DEFAULT_TANK_FULL_DISTANCE;
+        if (empty > 0) {
+          tankMigrateRef.current = true;
+          await firebaseService.saveConfig(
+            buildFirebaseConfigPayload(thresholds, empty, full, true),
+          );
+        }
+      } catch {}
+    });
+    return unsub;
   }, []);
 
   const loadChartData = useCallback(async () => {
@@ -1072,6 +1124,7 @@ export default function DashboardScreen() {
             pumpState={pumpState}
             autoMode={autoMode}
             maxWaterDist={maxWaterDist}
+            tankFullDist={tankFullDist}
           />
 
           {/* Hourly strip */}
@@ -1092,10 +1145,11 @@ export default function DashboardScreen() {
             sensorData={sensorData}
             dailyData={dailyData}
             maxWaterDist={maxWaterDist}
+            tankFullDist={tankFullDist}
           />
 
           {/* Cảnh báo môi trường */}
-          <AlertStrip sensorData={sensorData} maxWaterDist={maxWaterDist} />
+          <AlertStrip sensorData={sensorData} maxWaterDist={maxWaterDist} tankFullDist={tankFullDist} />
 
           <View style={{ height: 24 }} />
         </ScrollView>

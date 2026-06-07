@@ -2,7 +2,7 @@ import React from 'react';
 import { IconText } from '../AppIcon';
 import { PumpUnitIllustration } from './ControlSceneIllustrations';
 
-function WaterLevelGauge({ waterPct, waterDistance, statusLabel, statusIcon, statusColor }) {
+function WaterLevelGauge({ waterPct, statusLabel, statusIcon, statusColor, hasData }) {
   const fillY = 120 - (waterPct / 100) * 88;
   return (
     <div className="settings-stat-card settings-stat-card--water">
@@ -25,10 +25,10 @@ function WaterLevelGauge({ waterPct, waterDistance, statusLabel, statusIcon, sta
         </svg>
       </div>
       <div className="settings-stat-body">
-        <span className="settings-stat-label">Mức nước</span>
-        <span className="settings-stat-value">{waterDistance !== null ? `${waterPct}%` : '--'}</span>
+        <span className="settings-stat-label">Mức nước bể</span>
+        <span className="settings-stat-value">{hasData ? `${waterPct}%` : '--'}</span>
         <span className="settings-stat-sub">
-          {waterDistance !== null ? `${waterDistance} cm` : 'Chưa có dữ liệu'}
+          {hasData ? 'Quy đổi từ cảm biến siêu âm' : 'Chưa có dữ liệu'}
         </span>
         {statusLabel && (
           <span className="settings-stat-badge" style={{ color: statusColor }}>
@@ -109,7 +109,7 @@ export default function SettingsStatusPanel({
     <div className="settings-status-panel">
       <WaterLevelGauge
         waterPct={waterPct}
-        waterDistance={waterDistance}
+        hasData={waterDistance !== null}
         statusLabel={waterStatusLabel}
         statusIcon={waterStatusIcon}
         statusColor={waterStatusColor}

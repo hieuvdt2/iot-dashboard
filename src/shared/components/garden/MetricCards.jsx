@@ -1,6 +1,12 @@
 import React from 'react';
 import { getHourTrend } from '../../hooks/useGardenChartData';
 import AppIcon from '../AppIcon';
+import {
+  formatWaterPercent,
+  getWaterLevelStatus,
+  waterDistanceToPercent,
+  waterTrendAsPercent,
+} from '../../utils/waterLevel';
 
 const ICON_NAMES = {
   temp: 'thermometer',
@@ -45,11 +51,12 @@ function airStatus(air, minAirHum) {
   return { cls: 'ok', text: 'Ổn định' };
 }
 
-function waterStatus(water, maxWaterDistance) {
-  if (water == null) return null;
-  if (water > maxWaterDistance) return { cls: 'danger', text: 'Gần cạn' };
-  if (water > maxWaterDistance * 0.75) return { cls: 'warn', text: 'Thấp' };
-  return { cls: 'ok', text: 'Đủ nước' };
+function waterStatus(water, maxWaterDistance, tankFullDistance) {
+  const s = getWaterLevelStatus(water, maxWaterDistance, tankFullDistance);
+  if (!s) return null;
+  if (s.key === 'empty') return { cls: 'danger', text: 'Gần cạn' };
+  if (s.key === 'low') return { cls: 'warn', text: 'Thấp' };
+  return { cls: 'ok', text: s.label };
 }
 
 const ICON_BG = {
@@ -71,11 +78,18 @@ export default function MetricCards({
   hourlyRaw,
   thresholds,
   maxWaterDistance,
+  tankFullDistance = 2,
 }) {
   const temp = sensorData?.nhiet_do ?? null;
   const soil = sensorData?.do_am_dat ?? null;
   const air = sensorData?.do_am_khong_khi ?? null;
   const water = sensorData?.muc_nuoc ?? null;
+  const waterPct = waterDistanceToPercent(water, maxWaterDistance, tankFullDistance);
+  const waterTrend = waterTrendAsPercent(
+    getHourTrend(hourlyRaw, 'muc_nuoc', water),
+    maxWaterDistance,
+    tankFullDistance,
+  );
 
   const { minSoil = 35, targetSoil = 65, maxTemp = 35, minAirHum = 50 } = thresholds;
 
@@ -111,13 +125,13 @@ export default function MetricCards({
     },
     {
       key: 'water',
-      label: 'Mực nước',
-      value: water != null ? `${water} cm` : '—',
+      label: 'Mực nước bể',
+      value: formatWaterPercent(water, maxWaterDistance, tankFullDistance),
       icon: ICON_NAMES.water,
-      trend: getHourTrend(hourlyRaw, 'muc_nuoc', water),
-      trendUnit: ' cm',
-      status: waterStatus(water, maxWaterDistance),
-      valueColor: water != null && water > maxWaterDistance * 0.75 ? '#d97706' : undefined,
+      trend: waterTrend,
+      trendUnit: '%',
+      status: waterStatus(water, maxWaterDistance, tankFullDistance),
+      valueColor: waterPct != null && waterPct < 25 ? '#d97706' : undefined,
     },
   ];
 

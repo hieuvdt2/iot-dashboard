@@ -1,5 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import AppIcon, { IconHeading } from './AppIcon';
+import {
+  formatCmForInput,
+  formatDistanceLabel,
+  loadTankDistanceUnit,
+  parseInputToCm,
+  saveTankDistanceUnit,
+  tankConfigEqual,
+  waterDistanceToPercent,
+} from '../utils/waterLevel';
 
 // maxWaterDistance là cài đặt phần cứng, không phải thuộc tính cây trồng
 // nên không đưa vào preset. Xem mục "Cài đặt bể nước" riêng bên dưới.
@@ -71,7 +80,10 @@ function ConfigPage({
   hasUnsavedDraft,
   sensorData,
   maxWaterDistance,
-  onMaxWaterDistanceChange,
+  tankFullDistance,
+  onSaveTankConfig,
+  onMarkWaterCalibrated,
+  waterTankCalibrated,
   onSelectPreset,
   onApplyDraft,
   onDiscardDraft,
@@ -94,6 +106,81 @@ function ConfigPage({
   const [thresholdErrors, setThresholdErrors] = useState({});
   const [presetFieldErrors, setPresetFieldErrors] = useState({});
   const [confirmState, setConfirmState] = useState(null);
+  const [tankUnit, setTankUnit] = useState(loadTankDistanceUnit);
+  const [draftEmptyCm, setDraftEmptyCm] = useState(maxWaterDistance ?? 20);
+  const [draftFullCm, setDraftFullCm] = useState(tankFullDistance ?? 2);
+  const [emptyText, setEmptyText] = useState(() => formatCmForInput(maxWaterDistance ?? 20, loadTankDistanceUnit()));
+  const [fullText, setFullText] = useState(() => formatCmForInput(tankFullDistance ?? 2, loadTankDistanceUnit()));
+  const [savingTank, setSavingTank] = useState(false);
+
+  useEffect(() => {
+    setDraftEmptyCm(maxWaterDistance ?? 20);
+    setDraftFullCm(tankFullDistance ?? 2);
+    setEmptyText(formatCmForInput(maxWaterDistance ?? 20, tankUnit));
+    setFullText(formatCmForInput(tankFullDistance ?? 2, tankUnit));
+  }, [maxWaterDistance, tankFullDistance]);
+
+  const hasUnsavedTank = !tankConfigEqual(
+    draftEmptyCm,
+    draftFullCm,
+    maxWaterDistance ?? 20,
+    tankFullDistance ?? 2,
+  );
+
+  const handleTankUnitChange = (unit) => {
+    saveTankDistanceUnit(unit);
+    setTankUnit(unit);
+    setEmptyText(formatCmForInput(draftEmptyCm, unit));
+    setFullText(formatCmForInput(draftFullCm, unit));
+  };
+
+  const handleEmptyInput = (text) => {
+    setEmptyText(text);
+    const cm = parseInputToCm(text, tankUnit);
+    if (cm != null && cm > 0) setDraftEmptyCm(cm);
+  };
+
+  const handleFullInput = (text) => {
+    setFullText(text);
+    const cm = parseInputToCm(text, tankUnit);
+    if (cm != null && cm >= 0) setDraftFullCm(cm);
+  };
+
+  const applyTankFromSensor = (cm, kind) => {
+    const empty = kind === 'empty' ? cm : draftEmptyCm;
+    const full = kind === 'full' ? cm : draftFullCm;
+    if (kind === 'empty') {
+      setDraftEmptyCm(cm);
+      setEmptyText(formatCmForInput(cm, tankUnit));
+    } else {
+      setDraftFullCm(cm);
+      setFullText(formatCmForInput(cm, tankUnit));
+    }
+    onMarkWaterCalibrated?.();
+    onSaveTankConfig?.(empty, full);
+  };
+
+  const handleSaveTank = async () => {
+    if (!canEdit || savingTank) return;
+    const empty = parseInputToCm(emptyText, tankUnit) ?? draftEmptyCm;
+    const full = parseInputToCm(fullText, tankUnit) ?? draftFullCm;
+    if (!empty || empty <= 0 || full == null || full < 0 || empty <= full) return;
+    setSavingTank(true);
+    try {
+      setDraftEmptyCm(empty);
+      setDraftFullCm(full);
+      onMarkWaterCalibrated?.();
+      await onSaveTankConfig?.(empty, full);
+    } finally {
+      setSavingTank(false);
+    }
+  };
+
+  const inputStep = tankUnit === 'm' ? '0.001' : '0.1';
+  const inputMax = tankUnit === 'm' ? '2' : '200';
+  const fullMax = tankUnit === 'm' ? '1.99' : '199';
+  const fullMin = tankUnit === 'm' ? '0.005' : '0.5';
+  const emptyMin = tankUnit === 'm' ? '0.01' : '1';
 
   const closeConfirm = () => setConfirmState(null);
 
@@ -637,35 +724,136 @@ function ConfigPage({
             <div>
               <IconHeading icon="container">Cài đặt bể nước</IconHeading>
               <p className="config-status">
-                Ngưỡng xác định bể còn nước hay không — không phụ thuộc loại cây trồng.
+                Hiệu chuẩn % mực nước theo bể thực tế — không phụ thuộc loại cây trồng.
               </p>
             </div>
           </div>
 
           <div className="water-tank-body">
+            <div className="water-tank-toolbar">
+              <div className="water-tank-unit-toggle" role="group" aria-label="Đơn vị khoảng cách">
+                <span className="water-tank-unit-label">Đơn vị:</span>
+                {['cm', 'm'].map((unit) => (
+                  <button
+                    key={unit}
+                    type="button"
+                    className={`water-tank-unit-btn${tankUnit === unit ? ' active' : ''}`}
+                    onClick={() => handleTankUnitChange(unit)}
+                    disabled={!canEdit}
+                  >
+                    {unit}
+                  </button>
+                ))}
+              </div>
+              {hasUnsavedTank
+                ? <span className="config-sync-badge pending">Chưa lưu</span>
+                : waterTankCalibrated && <span className="config-sync-badge synced">Đã lưu</span>}
+            </div>
+
             <label className="water-tank-field">
-              <span className="water-tank-label">Khoảng cách cảnh báo cạn bể</span>
+              <span className="water-tank-label">Chiều cao bể ({tankUnit})</span>
+              <p className="water-tank-hint">
+                Đo bằng thước từ đáy lên mặt cảm biến (HC-SR04 gắn trên đỉnh bể). Dùng làm mốc <strong>0%</strong> khi bể cạn.
+                {tankUnit === 'm' && ' Arduino vẫn gửi muc_nuoc theo cm — app tự quy đổi.'}
+              </p>
               <div className="water-tank-input-row">
                 <input
                   type="number"
                   className="water-tank-input"
-                  min="1"
-                  max="200"
-                  value={maxWaterDistance ?? 20}
-                  onChange={(e) => onMaxWaterDistanceChange(Number(e.target.value))}
+                  min={emptyMin}
+                  max={inputMax}
+                  step={inputStep}
+                  value={emptyText}
+                  onChange={(e) => handleEmptyInput(e.target.value)}
                   disabled={!canEdit}
                 />
-                <span className="water-tank-unit">cm</span>
+                <span className="water-tank-unit">{tankUnit}</span>
               </div>
             </label>
 
+            <label className="water-tank-field">
+              <span className="water-tank-label">Khoảng cách khi bể đầy (100%)</span>
+              <p className="water-tank-hint">
+                Giá trị <strong>muc_nuoc</strong> khi nước sát cảm biến — thường <strong>{tankUnit === 'm' ? '0.02–0.03 m' : '2–3 cm'}</strong>.
+              </p>
+              <div className="water-tank-input-row">
+                <input
+                  type="number"
+                  className="water-tank-input"
+                  min={fullMin}
+                  max={fullMax}
+                  step={inputStep}
+                  value={fullText}
+                  onChange={(e) => handleFullInput(e.target.value)}
+                  disabled={!canEdit}
+                />
+                <span className="water-tank-unit">{tankUnit}</span>
+              </div>
+            </label>
+
+            <div className="water-tank-actions">
+              <button
+                type="button"
+                className="btn-save water-tank-save"
+                onClick={handleSaveTank}
+                disabled={!canEdit || savingTank || !hasUnsavedTank}
+              >
+                {savingTank ? 'Đang lưu...' : 'Lưu cấu hình bể'}
+              </button>
+            </div>
+
+            <div className="water-tank-calib">
+              <p className="water-tank-calib-title"><strong>Hiệu chuẩn nhanh</strong> (tùy chọn — chính xác hơn đo thước):</p>
+              <ol className="water-tank-calib-steps">
+                <li>Nhập <strong>chiều cao bể</strong> rồi bấm <strong>Lưu</strong>, hoặc đổ hết nước → bấm &quot;Ghi mức cạn&quot;</li>
+                <li>Đổ <strong>đầy bể</strong>, chờ ổn định → bấm &quot;Ghi mức đầy&quot;</li>
+              </ol>
+              {sensorData?.muc_nuoc != null && canEdit && (
+                <div className="water-tank-calib-btns">
+                  <button
+                    type="button"
+                    className="water-tank-calib-btn"
+                    onClick={() => applyTankFromSensor(Number(sensorData.muc_nuoc), 'empty')}
+                  >
+                    Ghi {formatDistanceLabel(sensorData.muc_nuoc, tankUnit)} → mức cạn (0%)
+                  </button>
+                  <button
+                    type="button"
+                    className="water-tank-calib-btn water-tank-calib-btn--full"
+                    onClick={() => applyTankFromSensor(Number(sensorData.muc_nuoc), 'full')}
+                  >
+                    Ghi {formatDistanceLabel(sensorData.muc_nuoc, tankUnit)} → mức đầy (100%)
+                  </button>
+                </div>
+              )}
+              {!waterTankCalibrated && (
+                <p className="water-tank-calib-warn">
+                  Chưa hiệu chuẩn — nhập chiều cao bể và mức đầy, hoặc dùng 2 nút ghi bên dưới.
+                </p>
+              )}
+            </div>
+
             <div className="water-tank-note">
               <p>
-                <strong>Cảm biến đo khoảng cách từ đầu bể xuống mặt nước.</strong>
+                Công thức: <strong>% = (chiều cao bể − muc_nuoc hiện tại) / (chiều cao bể − mức đầy) × 100</strong>
               </p>
               <p>
-                Nếu khoảng cách &gt; {maxWaterDistance ?? 20} cm → cảnh báo &quot;Nước thấp / Cạn&quot; và khoá bơm an toàn.
+                <strong>muc_nuoc</strong> là khoảng cách siêu âm đo được (<code>duration × 0.034 / 2</code> cm).
+                Số càng nhỏ = nước càng nhiều.
               </p>
+              <p>
+                ESP32 dùng chiều cao bể (mức cạn) để cảnh báo: muc_nuoc &gt; ngưỡng → tắt bơm.
+              </p>
+              {sensorData?.muc_nuoc != null && (
+                <p>
+                  Đọc hiện tại: <strong>{formatDistanceLabel(sensorData.muc_nuoc, tankUnit)}</strong>
+                  {' → '}
+                  <strong>
+                    {waterDistanceToPercent(sensorData.muc_nuoc, draftEmptyCm, draftFullCm) ?? '—'}%
+                  </strong>
+                  {hasUnsavedTank && ' (xem trước — chưa lưu)'}
+                </p>
+              )}
             </div>
           </div>
         </div>

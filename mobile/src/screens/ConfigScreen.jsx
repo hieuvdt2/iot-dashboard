@@ -6,6 +6,20 @@ import {
 import { C } from '../theme';
 import { useMqtt } from '../MqttContext';
 import { firebaseService } from '../services/firebaseService';
+import {
+  buildFirebaseConfigPayload,
+  buildMqttConfigPayload,
+  DEFAULT_TANK_FULL_DISTANCE,
+  formatCmForInput,
+  formatDistanceLabel,
+  loadTankDistanceUnit,
+  parseInputToCm,
+  saveTankDistanceUnit,
+  splitDeviceConfig,
+  tankConfigEqual,
+  WATER_CALIBRATION_KEY,
+  waterDistanceToPercent,
+} from '../utils/waterLevel';
 
 /* ─── Constants ─── */
 // maxWaterDistance là cài đặt phần cứng (kích thước bể), không thuộc cây trồng
@@ -30,19 +44,19 @@ const FIELDS = [
 const BASE_PRESETS = [
   {
     key: 'rau', name: '🥬 Rau', isCustom: false,
-    config: { minSoil: 45, targetSoil: 70, maxTemp: 32, minAirHum: 55, maxLux: 18000, maxWaterDistance: 20 },
+    config: { minSoil: 45, targetSoil: 70, maxTemp: 32, minAirHum: 55, maxLux: 18000 },
   },
   {
     key: 'xuong_rong', name: '🌵 Xương rồng', isCustom: false,
-    config: { minSoil: 15, targetSoil: 30, maxTemp: 38, minAirHum: 35, maxLux: 22000, maxWaterDistance: 25 },
+    config: { minSoil: 15, targetSoil: 30, maxTemp: 38, minAirHum: 35, maxLux: 22000 },
   },
   {
     key: 'lan', name: '🌸 Lan', isCustom: false,
-    config: { minSoil: 40, targetSoil: 60, maxTemp: 30, minAirHum: 60, maxLux: 16000, maxWaterDistance: 20 },
+    config: { minSoil: 40, targetSoil: 60, maxTemp: 30, minAirHum: 60, maxLux: 16000 },
   },
   {
     key: 'cay_canh', name: '🌿 Cây cảnh', isCustom: false,
-    config: { minSoil: 35, targetSoil: 55, maxTemp: 34, minAirHum: 50, maxLux: 18000, maxWaterDistance: 20 },
+    config: { minSoil: 35, targetSoil: 55, maxTemp: 34, minAirHum: 50, maxLux: 18000 },
   },
 ];
 
@@ -235,6 +249,90 @@ export default function ConfigScreen() {
   const [deployed, setDeployed]       = useState(DEFAULT_CONFIG);
   const [draft, setDraft]             = useState(DEFAULT_CONFIG);
   const [maxWaterDist, setMaxWaterDist] = useState(DEFAULT_MAX_WATER_DISTANCE);
+  const [tankFullDist, setTankFullDist] = useState(DEFAULT_TANK_FULL_DISTANCE);
+  const [waterTankCalibrated, setWaterTankCalibrated] = useState(false);
+  const [tankUnit, setTankUnit] = useState('cm');
+  const [draftEmptyCm, setDraftEmptyCm] = useState(DEFAULT_MAX_WATER_DISTANCE);
+  const [draftFullCm, setDraftFullCm] = useState(DEFAULT_TANK_FULL_DISTANCE);
+  const [emptyText, setEmptyText] = useState('');
+  const [fullText, setFullText] = useState('');
+  const [savingTank, setSavingTank] = useState(false);
+
+  const markCalibrated = useCallback(async () => {
+    setWaterTankCalibrated(true);
+    try {
+      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+      await AsyncStorage.setItem(WATER_CALIBRATION_KEY, 'true');
+    } catch {}
+  }, []);
+
+  const persistTankConfig = useCallback(async (emptyCm, fullCm) => {
+    setMaxWaterDist(emptyCm);
+    setTankFullDist(fullCm);
+    setDraftEmptyCm(emptyCm);
+    setDraftFullCm(fullCm);
+    setEmptyText(formatCmForInput(emptyCm, tankUnit));
+    setFullText(formatCmForInput(fullCm, tankUnit));
+    await markCalibrated();
+    try {
+      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+      await AsyncStorage.setItem('iot_max_water_distance', String(emptyCm));
+      await AsyncStorage.setItem('iot_tank_full_distance', String(fullCm));
+      const payload = buildFirebaseConfigPayload(deployed, emptyCm, fullCm, true);
+      const mqttPayload = buildMqttConfigPayload(deployed, emptyCm, fullCm);
+      await firebaseService.saveConfig(payload);
+      publishConfig(mqttPayload);
+    } catch {}
+  }, [markCalibrated, deployed, publishConfig, tankUnit]);
+
+  const handleSaveTank = useCallback(async () => {
+    if (savingTank) return;
+    const emptyCm = parseInputToCm(emptyText, tankUnit) ?? draftEmptyCm;
+    const fullCm = parseInputToCm(fullText, tankUnit) ?? draftFullCm;
+    if (!emptyCm || emptyCm <= 0 || fullCm == null || fullCm < 0 || emptyCm <= fullCm) {
+      Alert.alert('Lỗi', 'Kiểm tra lại chiều cao bể và mức đầy.');
+      return;
+    }
+    setSavingTank(true);
+    try {
+      await persistTankConfig(emptyCm, fullCm);
+      Alert.alert('Thành công', 'Đã lưu cấu hình bể nước.');
+    } catch (e) {
+      Alert.alert('Lỗi', e.message || 'Không thể lưu cấu hình bể.');
+    } finally {
+      setSavingTank(false);
+    }
+  }, [savingTank, emptyText, fullText, tankUnit, draftEmptyCm, draftFullCm, persistTankConfig]);
+
+  const applyTankFromSensor = useCallback(async (cm, kind) => {
+    const emptyCm = kind === 'empty' ? cm : draftEmptyCm;
+    const fullCm = kind === 'full' ? cm : draftFullCm;
+    if (kind === 'empty') {
+      setDraftEmptyCm(cm);
+      setEmptyText(formatCmForInput(cm, tankUnit));
+    } else {
+      setDraftFullCm(cm);
+      setFullText(formatCmForInput(cm, tankUnit));
+    }
+    setSavingTank(true);
+    try {
+      await persistTankConfig(emptyCm, fullCm);
+    } finally {
+      setSavingTank(false);
+    }
+  }, [draftEmptyCm, draftFullCm, persistTankConfig, tankUnit]);
+
+  const handleTankUnitChange = useCallback(async (unit) => {
+    setTankUnit(unit);
+    try {
+      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+      saveTankDistanceUnit(unit, AsyncStorage);
+    } catch {}
+    setEmptyText(formatCmForInput(draftEmptyCm, unit));
+    setFullText(formatCmForInput(draftFullCm, unit));
+  }, [draftEmptyCm, draftFullCm]);
+
+  const hasUnsavedTank = !tankConfigEqual(draftEmptyCm, draftFullCm, maxWaterDist, tankFullDist);
   const [customPresets, setCustomPresets] = useState([]);
   const [selectedPreset, setSelectedPreset] = useState('');
   const [saving, setSaving]           = useState(false);
@@ -257,16 +355,28 @@ export default function ConfigScreen() {
   useEffect(() => {
     const unsubscribe = firebaseService.subscribeDeployedConfig((cfg) => {
       if (cfg) {
+        const { thresholds, tankEmpty, tankFull, tankCalibrated } = splitDeviceConfig(cfg);
         const t = {
-          minSoil:          cfg.minSoil          ?? DEFAULT_CONFIG.minSoil,
-          targetSoil:       cfg.targetSoil       ?? DEFAULT_CONFIG.targetSoil,
-          maxTemp:          cfg.maxTemp          ?? DEFAULT_CONFIG.maxTemp,
-          minAirHum:        cfg.minAirHum        ?? DEFAULT_CONFIG.minAirHum,
-          maxLux:           cfg.maxLux           ?? DEFAULT_CONFIG.maxLux,
-          maxWaterDistance: cfg.maxWaterDistance ?? DEFAULT_CONFIG.maxWaterDistance,
+          minSoil:    thresholds.minSoil    ?? DEFAULT_CONFIG.minSoil,
+          targetSoil: thresholds.targetSoil ?? DEFAULT_CONFIG.targetSoil,
+          maxTemp:    thresholds.maxTemp    ?? DEFAULT_CONFIG.maxTemp,
+          minAirHum:  thresholds.minAirHum  ?? DEFAULT_CONFIG.minAirHum,
+          maxLux:     thresholds.maxLux     ?? DEFAULT_CONFIG.maxLux,
         };
         setDeployed(t);
         setDraft(prev => thresholdsEqual(prev, DEFAULT_CONFIG) ? t : prev);
+        if (tankCalibrated) {
+          if (tankEmpty != null && tankEmpty > 0) {
+            setMaxWaterDist(tankEmpty);
+            setDraftEmptyCm(tankEmpty);
+            setEmptyText(formatCmForInput(tankEmpty, tankUnit));
+          }
+          if (tankFull != null && tankFull >= 0) {
+            setTankFullDist(tankFull);
+            setDraftFullCm(tankFull);
+            setFullText(formatCmForInput(tankFull, tankUnit));
+          }
+        }
       }
     });
     return unsubscribe;
@@ -280,8 +390,22 @@ export default function ConfigScreen() {
       if (savedDraft) setDraft(savedDraft);
       try {
         const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-        const v = await AsyncStorage.getItem('iot_max_water_distance');
-        if (v) setMaxWaterDist(Number(v));
+        const [emptyV, fullV, calibV] = await Promise.all([
+          AsyncStorage.getItem('iot_max_water_distance'),
+          AsyncStorage.getItem('iot_tank_full_distance'),
+          AsyncStorage.getItem(WATER_CALIBRATION_KEY),
+        ]);
+        const unit = loadTankDistanceUnit(AsyncStorage);
+        setTankUnit(unit);
+        const emptyCm = emptyV ? Number(emptyV) : DEFAULT_MAX_WATER_DISTANCE;
+        const fullCm = fullV ? Number(fullV) : DEFAULT_TANK_FULL_DISTANCE;
+        setMaxWaterDist(emptyCm);
+        setTankFullDist(fullCm);
+        setDraftEmptyCm(emptyCm);
+        setDraftFullCm(fullCm);
+        setEmptyText(formatCmForInput(emptyCm, unit));
+        setFullText(formatCmForInput(fullCm, unit));
+        if (calibV === 'true') setWaterTankCalibrated(true);
       } catch {}
     })();
   }, []);
@@ -291,8 +415,10 @@ export default function ConfigScreen() {
     if (!hasDraft || saving) return;
     setSaving(true);
     try {
-      await firebaseService.saveConfig(draft);
-      publishConfig(draft);
+      const fbPayload = buildFirebaseConfigPayload(draft, maxWaterDist, tankFullDist, waterTankCalibrated);
+      const mqttPayload = buildMqttConfigPayload(draft, maxWaterDist, tankFullDist);
+      await firebaseService.saveConfig(fbPayload);
+      publishConfig(mqttPayload);
       setDeployed(draft);
       await firebaseService.saveDraftThresholds(draft);
       Alert.alert('Thành công', 'Đã áp dụng cài đặt lên thiết bị');
@@ -301,7 +427,7 @@ export default function ConfigScreen() {
     } finally {
       setSaving(false);
     }
-  }, [draft, hasDraft, saving, publishConfig]);
+  }, [draft, hasDraft, saving, publishConfig, maxWaterDist, tankFullDist, waterTankCalibrated]);
 
   /* Apply preset as draft */
   const applyPreset = useCallback((preset) => {
@@ -416,35 +542,110 @@ export default function ConfigScreen() {
 
       {/* Cài đặt bể nước — device-level, không phụ thuộc loại cây */}
       <View style={cs.card}>
-        <Text style={cs.cardTitle}>🪣 Cài đặt bể nước</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <Text style={cs.cardTitle}>🪣 Cài đặt bể nước</Text>
+          {hasUnsavedTank
+            ? <View style={[cs.pill, cs.pillOrange]}><Text style={cs.pillOrangeText}>Chưa lưu</Text></View>
+            : waterTankCalibrated && <View style={[cs.pill, cs.pillGreen]}><Text style={cs.pillGreenText}>Đã lưu ✓</Text></View>}
+        </View>
         <Text style={cs.cardSub}>
-          Ngưỡng phát hiện bể cạn — đặt 1 lần theo kích thước bể thực tế.
-          Không liên quan đến loại cây trồng.
+          Nhập chiều cao bể để tính % mực nước — cảm biến HC-SR04 gắn trên đỉnh bể.
         </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: C.text2 }}>Đơn vị:</Text>
+          {['cm', 'm'].map((unit) => (
+            <TouchableOpacity
+              key={unit}
+              style={[cs.unitBtn, tankUnit === unit && cs.unitBtnActive]}
+              onPress={() => handleTankUnitChange(unit)}
+            >
+              <Text style={[cs.unitBtnText, tankUnit === unit && cs.unitBtnTextActive]}>{unit}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={{ fontSize: 13, fontWeight: '600', color: C.text, marginBottom: 4 }}>Chiều cao bể ({tankUnit})</Text>
+        <Text style={{ fontSize: 12, color: C.text2, marginBottom: 8, lineHeight: 18 }}>
+          Đo bằng thước từ đáy lên cảm biến. Dùng làm mốc 0% khi bể cạn.
+        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
           <TextInput
-            style={[fs.inputRow, { width: 90, paddingHorizontal: 12, color: C.text }]}
-            value={String(maxWaterDist)}
-            onChangeText={async (v) => {
-              const n = Number(v);
-              if (!isNaN(n) && n > 0) {
-                setMaxWaterDist(n);
-                try {
-                  const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-                  await AsyncStorage.setItem('iot_max_water_distance', String(n));
-                } catch {}
-              }
+            style={[fs.inputRow, { flex: 1, maxWidth: 120, paddingHorizontal: 12, color: C.text }]}
+            value={emptyText}
+            onChangeText={(v) => {
+              setEmptyText(v);
+              const cm = parseInputToCm(v, tankUnit);
+              if (cm != null && cm > 0) setDraftEmptyCm(cm);
             }}
-            keyboardType="numeric"
-            placeholder="20"
+            keyboardType="decimal-pad"
+            placeholder={tankUnit === 'm' ? '0.13' : '13'}
             placeholderTextColor={C.text3}
           />
-          <Text style={{ fontSize: 13, color: C.text2 }}>cm</Text>
+          <Text style={{ fontSize: 13, color: C.text2 }}>{tankUnit}</Text>
         </View>
+
+        <Text style={{ fontSize: 13, fontWeight: '600', color: C.text, marginBottom: 4 }}>Khoảng cách khi đầy (100%)</Text>
+        <Text style={{ fontSize: 12, color: C.text2, marginBottom: 8, lineHeight: 18 }}>
+          Giá trị muc_nuoc khi nước sát cảm biến — thường {tankUnit === 'm' ? '0.02–0.03 m' : '2–3 cm'}.
+        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+          <TextInput
+            style={[fs.inputRow, { flex: 1, maxWidth: 120, paddingHorizontal: 12, color: C.text }]}
+            value={fullText}
+            onChangeText={(v) => {
+              setFullText(v);
+              const cm = parseInputToCm(v, tankUnit);
+              if (cm != null && cm >= 0) setDraftFullCm(cm);
+            }}
+            keyboardType="decimal-pad"
+            placeholder={tankUnit === 'm' ? '0.02' : '2'}
+            placeholderTextColor={C.text3}
+          />
+          <Text style={{ fontSize: 13, color: C.text2 }}>{tankUnit}</Text>
+        </View>
+
+        <TouchableOpacity
+          style={[cs.btnSave, { marginBottom: 12 }, (!hasUnsavedTank || savingTank) && cs.btnDisabled]}
+          onPress={handleSaveTank}
+          disabled={!hasUnsavedTank || savingTank}
+        >
+          {savingTank
+            ? <ActivityIndicator size="small" color="#fff" />
+            : <Text style={cs.btnSaveText}>💾 Lưu cấu hình bể</Text>}
+        </TouchableOpacity>
+
+        {sensorData?.waterLevel != null && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+            <TouchableOpacity
+              style={[cs.btnGhost, { flex: 1, minWidth: 140 }]}
+              onPress={() => applyTankFromSensor(Number(sensorData.waterLevel), 'empty')}
+            >
+              <Text style={cs.btnGhostText}>Ghi {formatDistanceLabel(sensorData.waterLevel, tankUnit)} → cạn</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[cs.btnGhost, { flex: 1, minWidth: 140 }]}
+              onPress={() => applyTankFromSensor(Number(sensorData.waterLevel), 'full')}
+            >
+              <Text style={cs.btnGhostText}>Ghi {formatDistanceLabel(sensorData.waterLevel, tankUnit)} → đầy</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         <View style={{ backgroundColor: C.blueLight, borderRadius: 8, borderWidth: 1, borderColor: '#bfdbfe', padding: 12 }}>
           <Text style={{ fontSize: 13, color: '#1e40af', lineHeight: 20 }}>
-            <Text style={{ fontWeight: '700' }}>Cảm biến đo khoảng cách từ đỉnh bể xuống mặt nước.</Text>
-            {'\n'}Nếu khoảng cách {'>'} {maxWaterDist} cm → cảnh báo "Cạn" và khoá bơm an toàn.
+            <Text style={{ fontWeight: '700' }}>Cách tính %:</Text>
+            {'\n'}% = (chiều cao bể − muc_nuoc) / (chiều cao bể − mức đầy) × 100
+            {sensorData?.waterLevel != null && (
+              <>
+                {'\n\n'}Đọc hiện tại: {formatDistanceLabel(sensorData.waterLevel, tankUnit)}
+                {' → '}
+                {waterDistanceToPercent(sensorData.waterLevel, draftEmptyCm, draftFullCm) ?? '--'}%
+                {hasUnsavedTank ? ' (xem trước — chưa lưu)' : ''}
+              </>
+            )}
+            {!waterTankCalibrated && (
+              <>{'\n\n'}Nhập chiều cao bể rồi bấm &quot;Lưu cấu hình bể&quot;.</>
+            )}
           </Text>
         </View>
       </View>
@@ -635,6 +836,18 @@ const cs = StyleSheet.create({
   pillOrangeText: { fontSize: 12, fontWeight: '600', color: '#c2410c' },
   pillGray: { backgroundColor: '#f3f4f6', borderColor: C.border },
   pillGrayText: { fontSize: 12, fontWeight: '600', color: C.text2 },
+
+  unitBtn: {
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    backgroundColor: C.bgCard,
+  },
+  unitBtnActive: { backgroundColor: '#dcfce7', borderColor: '#86efac' },
+  unitBtnText: { fontSize: 13, fontWeight: '600', color: C.text2 },
+  unitBtnTextActive: { color: '#166534', fontWeight: '700' },
 
   presetList: { gap: 8, marginTop: 4 },
   presetRow: {

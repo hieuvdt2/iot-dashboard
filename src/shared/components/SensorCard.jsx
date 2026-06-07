@@ -1,5 +1,6 @@
 import React from 'react';
 import AppIcon from './AppIcon';
+import { formatWaterPercent } from '../utils/waterLevel';
 
 const SENSOR_CONFIG = [
   {
@@ -36,22 +37,27 @@ const SENSOR_CONFIG = [
   },
   {
     key: 'muc_nuoc',
-    label: 'Mực nước',
-    unit: 'cm',
+    label: 'Mực nước bể',
+    unit: '%',
     icon: 'waves',
     color: '#ffd43b',
     bg: 'rgba(255,212,59,0.08)',
+    isWaterLevel: true,
   },
 ];
 
-function SensorCard({ sensorData, connected }) {
+function SensorCard({ sensorData, connected, maxWaterDistance = 20, tankFullDistance = 2 }) {
   return (
     <div className="sensor-cards">
       {SENSOR_CONFIG.map((sensor) => {
-        const value =
+        const raw =
           sensorData && sensorData[sensor.key] !== undefined
             ? sensorData[sensor.key]
             : null;
+        const value = sensor.isWaterLevel
+          ? (raw !== null ? formatWaterPercent(raw, maxWaterDistance, tankFullDistance).replace('%', '') : null)
+          : raw;
+        const unit = sensor.isWaterLevel && raw !== null ? '%' : sensor.unit;
 
         return (
           <div
@@ -65,7 +71,7 @@ function SensorCard({ sensorData, connected }) {
             <div className="sensor-label">{sensor.label}</div>
             <div className="sensor-value" style={{ color: sensor.color }}>
               {value !== null ? `${value}` : '--'}
-              <span className="sensor-unit">{value !== null ? sensor.unit : ''}</span>
+              <span className="sensor-unit">{value !== null ? unit : ''}</span>
             </div>
             <div className={`sensor-status ${connected ? 'live' : 'offline'}`}>
               {connected ? 'LIVE' : 'OFFLINE'}
