@@ -14,6 +14,10 @@ import {
   ReferenceArea,
 } from 'recharts';
 import { waterDistanceToPercent } from '../../utils/waterLevel';
+import {
+  formatLightChartTick,
+  lightChartValue,
+} from '../../utils/lightDisplay';
 
 const COLORS = {
   primary: '#38bdf8',
@@ -121,6 +125,14 @@ export default function GardenCharts({ chartData, loading, maxWaterDistance, tan
       max: waterDistanceToPercent(waterStats.min, maxWaterDistance, tankFullDistance),
     };
   }, [waterStats, maxWaterDistance, tankFullDistance]);
+
+  const lightChartData = useMemo(
+    () => chartData.map((row) => ({
+      ...row,
+      anh_sang_ui: lightChartValue(row.anh_sang),
+    })),
+    [chartData],
+  );
 
   return (
     <div className="gd-charts">
@@ -237,12 +249,12 @@ export default function GardenCharts({ chartData, loading, maxWaterDistance, tan
       {/* Light */}
       <ChartShell
         title="Cường độ ánh sáng"
-        subtitle="Theo giờ (lux)"
+        subtitle="Theo giờ (sáng / tối)"
         loading={loading}
         empty={lightEmpty}
       >
         <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={chartData} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+          <BarChart data={lightChartData} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
             <defs>
               <linearGradient id="lightGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={COLORS.lightStart} />
@@ -251,16 +263,21 @@ export default function GardenCharts({ chartData, loading, maxWaterDistance, tan
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
             <XAxis dataKey="time" tick={{ fill: COLORS.text, fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: COLORS.text, fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis
+              domain={[0, 1]}
+              ticks={[0, 1]}
+              tickFormatter={formatLightChartTick}
+              tick={{ fill: COLORS.text, fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+            />
             <Tooltip
               content={(
-                <ChartTooltip
-                  formatter={(v) => (v != null ? `${Number(v).toLocaleString('vi-VN')} lux` : '—')}
-                />
+                <ChartTooltip formatter={(v) => formatLightChartTick(v) || '—'} />
               )}
             />
             <Bar
-              dataKey="anh_sang"
+              dataKey="anh_sang_ui"
               fill="url(#lightGrad)"
               radius={[6, 6, 0, 0]}
               animationDuration={800}

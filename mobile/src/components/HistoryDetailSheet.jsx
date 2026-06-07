@@ -8,8 +8,9 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { firebaseService } from '../services/firebaseService';
 import { normalizeSensorPayload } from '../utils/normalizeSensor';
 import WeatherDayChart from './WeatherDayChart';
-import { DEFAULT_TANK_FULL_DISTANCE, WATER_CALIBRATION_KEY, waterDistanceToPercent } from '../utils/waterLevel';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DEFAULT_TANK_FULL_DISTANCE, waterDistanceToPercent } from '../utils/waterLevel';
+import { formatLightLabel } from '../utils/lightDisplay';
+import { useTankCalibration } from '../hooks/useTankCalibration';
 const VN_WEEKDAY = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
 const VN_DAY_SHORT = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 const OVERLAY_DAYS = 1;
@@ -53,7 +54,7 @@ const SENSOR_LIST = [
   { key: 'temperature', label: 'Nhiệt độ', unit: '°C', lib: 'mci', icon: 'thermometer', color: '#ef4444' },
   { key: 'soilHum',     label: 'Đ.A đất',  unit: '%',  lib: 'mci', icon: 'sprout',        color: '#22c55e' },
   { key: 'airHum',      label: 'Đ.A KK',   unit: '%',  lib: 'ion', icon: 'water-outline', color: '#3b82f6' },
-  { key: 'light',       label: 'Ánh sáng', unit: 'lux', lib: 'ion', icon: 'sunny-outline', color: '#f59e0b' },
+  { key: 'light',       label: 'Ánh sáng', unit: '', lib: 'ion', icon: 'sunny-outline', color: '#f59e0b' },
   { key: 'waterLevel',  label: 'Mực nước bể', unit: '%', lib: 'ion', icon: 'water',         color: '#06b6d4', isWaterLevel: true },
 ];
 
@@ -63,7 +64,7 @@ const SENSOR_INFO = {
   temperature: 'Nhiệt độ đo mức nóng lạnh quanh khu vực trồng. Theo dõi liên tục giúp phát hiện sớm khi môi trường quá nóng hoặc quá lạnh so với nhu cầu của cây.',
   soilHum: 'Độ ẩm đất cho biết lượng nước còn trong đất. Giá trị thấp kéo dài có thể khiến cây thiếu nước; giá trị quá cao có thể gây úng rễ.',
   airHum: 'Độ ẩm không khí ảnh hưởng đến quá trình thoát hơi nước của lá. Không khí khô làm cây mất nước nhanh hơn.',
-  light: 'Cường độ ánh sáng (lux) phản ánh lượng sáng cây nhận được trong ngày, hỗ trợ đánh giá vị trí đặt cây và che chắn.',
+  light: 'Cảm biến cảm quang báo trạng thái sáng hoặc tối quanh khu vực trồng — hỗ trợ theo dõi chu kỳ ngày/đêm.',
   waterLevel: 'Mực nước bể hiển thị theo % so với dung tích bể (100% = đầy, 0% = gần cạn).',
 };
 
@@ -154,11 +155,23 @@ function buildCompareIntro(selectedLabel, avg, yesterdayAvg, unit) {
   return `Mức trung bình ${selectedLabel.toLowerCase()} thấp hơn hôm qua khoảng ${Math.abs(diff)}${unit}.`;
 }
 
+function formatSensorReading(sensorKey, value, unit = '') {
+  if (value == null || !Number.isFinite(value)) return '--';
+  if (sensorKey === 'light') return formatLightLabel(value);
+  return `${value}${unit}`;
+}
+
 function statHint(dayStats, key, unit) {
   const avg = safeNum(dayStats?.[`${key}_avg`]);
   const mn = safeNum(dayStats?.[`${key}_min`]);
   const mx = safeNum(dayStats?.[`${key}_max`]);
   if (avg == null) return 'Chưa có dữ liệu';
+  if (key === 'light') {
+    if (mn != null && mx != null && mn !== mx) {
+      return `${formatLightLabel(mn)} – ${formatLightLabel(mx)}`;
+    }
+    return formatLightLabel(avg);
+  }
   if (mn != null && mx != null) return `${mn}–${mx}${unit}`;
   return `TB ${avg}${unit}`;
 }
@@ -277,22 +290,7 @@ export default function HistoryDetailSheet({
   );
   const [loading, setLoading] = useState(true);
   const [multiDayData, setMultiDayData] = useState({});
-  const [maxWaterDist, setMaxWaterDist] = useState(null);
-  const [tankFullDist, setTankFullDist] = useState(null);
-
-  useEffect(() => {
-    Promise.all([
-      AsyncStorage.getItem(WATER_CALIBRATION_KEY),
-      AsyncStorage.getItem('iot_max_water_distance'),
-      AsyncStorage.getItem('iot_tank_full_distance'),
-    ])
-      .then(([calibV, emptyV, fullV]) => {
-        if (calibV !== 'true') return;
-        if (emptyV) setMaxWaterDist(Number(emptyV));
-        if (fullV) setTankFullDist(Number(fullV));
-      })
-      .catch(() => {});
-  }, []);
+  const { maxWaterDist, tankFullDist } = useTankCalibration();
 
   const effectiveDateKey = useMemo(
     () => (parseDateKey(selectedDateKey) ? selectedDateKey : todayKey()),
@@ -372,8 +370,10 @@ export default function HistoryDetailSheet({
   const hasChart = entries.length > 0 || avg != null;
   const showYesterdayOverlay = yesterdayEntries.some((e) => safeNum(e[activeSensor]) != null);
   const selectedLabel = dayShortLabel(effectiveDateKey);
-  const compareIntro = buildCompareIntro(selectedLabel, avg, yesterdayAvg, meta.unit);
-  const displayVal = avg != null ? `${avg}${meta.unit}` : '--';
+  const compareIntro = activeSensor === 'light'
+    ? null
+    : buildCompareIntro(selectedLabel, avg, yesterdayAvg, meta.unit);
+  const displayVal = formatSensorReading(activeSensor, avg, meta.unit);
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -402,7 +402,7 @@ export default function HistoryDetailSheet({
             <Text style={s.heroLbl}>Trung bình trong ngày</Text>
             {min != null && max != null && (
               <Text style={s.heroRange}>
-                T: {min}{meta.unit}  ·  C: {max}{meta.unit}
+                T: {formatSensorReading(activeSensor, min, meta.unit)}  ·  C: {formatSensorReading(activeSensor, max, meta.unit)}
               </Text>
             )}
           </View>
@@ -431,9 +431,9 @@ export default function HistoryDetailSheet({
           </View>
 
           <View style={s.statGrid}>
-            <StatBox label="Thấp nhất" value={min} unit={meta.unit} color={meta.color} />
-            <StatBox label="Trung bình" value={avg} unit={meta.unit} color={meta.color} highlight />
-            <StatBox label="Cao nhất" value={max} unit={meta.unit} color={meta.color} />
+            <StatBox label="Thấp nhất" display={formatSensorReading(activeSensor, min, meta.unit)} color={meta.color} />
+            <StatBox label="Trung bình" display={formatSensorReading(activeSensor, avg, meta.unit)} color={meta.color} highlight />
+            <StatBox label="Cao nhất" display={formatSensorReading(activeSensor, max, meta.unit)} color={meta.color} />
           </View>
 
           {yesterdayAvg != null && avg != null && (
@@ -472,12 +472,12 @@ export default function HistoryDetailSheet({
   );
 }
 
-function StatBox({ label, value, unit, color, highlight }) {
-  const display = value != null && Number.isFinite(value) ? `${value}${unit}` : '--';
+function StatBox({ label, value, unit, display, color, highlight }) {
+  const text = display ?? (value != null && Number.isFinite(value) ? `${value}${unit}` : '--');
   return (
     <View style={[s.statBox, highlight && s.statBoxHi]}>
       <Text style={s.statBoxLbl}>{label}</Text>
-      <Text style={[s.statBoxVal, { color }]}>{display}</Text>
+      <Text style={[s.statBoxVal, { color }]}>{text}</Text>
     </View>
   );
 }

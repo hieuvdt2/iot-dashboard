@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import MqttService from './services/mqttService';
 import { firebaseService } from './services/firebaseService';
-import { normalizeSensorPayload } from './utils/normalizeSensor';
+import { normalizeSensorPayload, mergeSensorSnapshot } from './utils/normalizeSensor';
+import { applyDeviceStatus } from './utils/deviceStatus';
 
 const MqttContext = createContext(null);
 
@@ -20,8 +21,8 @@ export function MqttProvider({ children }) {
     mqtt.on('status', setMqttStatus);
 
     mqtt.on('sensorData', (d) => {
-      setSensorData(prev => ({ ...prev, ...d }));
-      setHistory(prev => {
+      setSensorData((prev) => mergeSensorSnapshot(prev, d));
+      setHistory((prev) => {
         const entry = {
           timeLabel: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
           temperature: d.temperature ?? null,
@@ -31,6 +32,10 @@ export function MqttProvider({ children }) {
         };
         return [entry, ...prev].slice(0, 50);
       });
+    });
+
+    mqtt.on('deviceStatus', (raw) => {
+      applyDeviceStatus(raw, setPumpState, setAutoMode);
     });
 
     mqtt.on('pumpStatus', (s) => {
@@ -44,10 +49,18 @@ export function MqttProvider({ children }) {
 
     mqtt.connect();
 
+    firebaseService.getLatestSensorData().then((data) => {
+      if (!data) return;
+      applyDeviceStatus(data, setPumpState, setAutoMode);
+      const n = normalizeSensorPayload(data);
+      setSensorData((prev) => mergeSensorSnapshot(prev, n));
+    }).catch(() => {});
+
     const unsubFirebase = firebaseService.subscribeLatest((data) => {
       if (!data) return;
+      applyDeviceStatus(data, setPumpState, setAutoMode);
       const n = normalizeSensorPayload(data);
-      setSensorData((prev) => ({ ...prev, ...n }));
+      setSensorData((prev) => mergeSensorSnapshot(prev, n));
     });
 
     return () => {

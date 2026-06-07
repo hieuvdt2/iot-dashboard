@@ -20,3 +20,14 @@ export function normalizeSensorPayload(raw) {
     light: num(raw.anh_sang ?? raw.lux ?? raw.light),
   };
 }
+
+/** Giữ giá trị cũ khi payload mới thiếu field (ESP32 không gửi muc_nuoc mỗi lần) */
+export function mergeSensorSnapshot(prev = {}, next = {}) {
+  const merged = { ...prev };
+  Object.entries(next).forEach(([key, value]) => {
+    if (value != null && Number.isFinite(Number(value))) {
+      merged[key] = value;
+    }
+  });
+  return merged;
+}

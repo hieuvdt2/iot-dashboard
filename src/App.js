@@ -13,6 +13,7 @@ import RegisterPage from './pages/RegisterPage';
 import AdminPage from './pages/AdminPage';
 import { mqttService, normalizeSensorPayload } from './shared/services/mqttService';
 import { normalizeEntry } from './shared/utils/sensorHistory';
+import { mergeSensorRecord, buildSensorPatch } from './shared/utils/sensorMerge';
 import { firebaseService } from './shared/services/firebaseService';
 import {
   buildHistoryFromFirebase,
@@ -20,6 +21,7 @@ import {
 import {
   buildEnvironmentAlerts,
 } from './shared/utils/environmentAlerts';
+import { formatLightLabel } from './shared/utils/lightDisplay';
 import {
   DEFAULT_TANK_FULL_DISTANCE,
   buildFirebaseConfigPayload,
@@ -278,20 +280,8 @@ function App() {
   }, []);
 
   const handleSensor = useCallback((raw) => {
-    if (!raw) {
-      setSensorData(null);
-      return;
-    }
-    const n = normalizeEntry(raw);
-    const aliases = normalizeSensorPayload(raw);
-    setSensorData({
-      ...raw,
-      nhiet_do: n.nhiet_do ?? aliases.temp ?? raw.nhiet_do,
-      do_am_khong_khi: n.do_am_khong_khi ?? aliases.humi ?? raw.do_am_khong_khi,
-      do_am_dat: n.do_am_dat ?? aliases.soil ?? raw.do_am_dat,
-      anh_sang: n.anh_sang ?? aliases.lux ?? raw.anh_sang,
-      muc_nuoc: n.muc_nuoc ?? aliases.distance ?? raw.muc_nuoc,
-    });
+    if (!raw) return;
+    setSensorData((prev) => mergeSensorRecord(prev, buildSensorPatch(raw, normalizeEntry, normalizeSensorPayload)));
   }, []);
 
   const handleConnect = useCallback((status) => {
@@ -786,7 +776,7 @@ function App() {
       nhietDo: sensorData.nhiet_do ?? '--',
       doAmKhongKhi: sensorData.do_am_khong_khi ?? '--',
       doAmDat: sensorData.do_am_dat ?? '--',
-      anhSang: sensorData.anh_sang ?? '--',
+      anhSang: sensorData?.anh_sang != null ? formatLightLabel(sensorData.anh_sang) : '--',
       mucNuoc: sensorData.muc_nuoc ?? '--',
       thoiGian: sensorData.time ?? '--',
     });

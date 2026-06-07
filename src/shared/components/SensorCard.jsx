@@ -1,5 +1,6 @@
 import React from 'react';
 import AppIcon from './AppIcon';
+import { formatLightLabel } from '../utils/lightDisplay';
 import { formatWaterPercent } from '../utils/waterLevel';
 
 const SENSOR_CONFIG = [
@@ -30,10 +31,11 @@ const SENSOR_CONFIG = [
   {
     key: 'anh_sang',
     label: 'Ánh sáng',
-    unit: 'lux',
+    unit: '',
     icon: 'lightbulb',
     color: '#ffa94d',
     bg: 'rgba(255,169,77,0.08)',
+    isLightLevel: true,
   },
   {
     key: 'muc_nuoc',
@@ -56,8 +58,14 @@ function SensorCard({ sensorData, connected, maxWaterDistance, tankFullDistance 
             : null;
         const value = sensor.isWaterLevel
           ? (raw !== null ? formatWaterPercent(raw, maxWaterDistance, tankFullDistance).replace('%', '') : null)
-          : raw;
-        const unit = sensor.isWaterLevel && raw !== null ? '%' : sensor.unit;
+          : sensor.isLightLevel
+            ? (raw !== null ? formatLightLabel(raw) : null)
+            : raw;
+        const unit = sensor.isWaterLevel && raw !== null
+          ? '%'
+          : sensor.isLightLevel
+            ? ''
+            : sensor.unit;
 
         return (
           <div

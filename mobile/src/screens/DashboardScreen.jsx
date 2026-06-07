@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   RefreshControl, ActivityIndicator, SafeAreaView,
@@ -10,8 +10,15 @@ import { useMqtt } from '../MqttContext';
 import { firebaseService } from '../services/firebaseService';
 import HistoryDetailSheet from '../components/HistoryDetailSheet';
 import WeatherDayChart from '../components/WeatherDayChart';
+import WateringStatusBar from '../components/WateringStatusBar';
 import { hourly24Filled, sliceHourlyWindow, seriesMinMax, safeNum as chartSafeNum } from '../utils/dayChart';
-import { buildFirebaseConfigPayload, DEFAULT_TANK_FULL_DISTANCE, splitDeviceConfig, WATER_CALIBRATION_KEY, waterDistanceToPercent } from '../utils/waterLevel';
+import {
+  formatLightLabel,
+  formatLightCondition,
+  lightLevelMeta,
+} from '../utils/lightDisplay';
+import { waterDistanceToPercent } from '../utils/waterLevel';
+import { useTankCalibration } from '../hooks/useTankCalibration';
 
 /* ── Icon helper ─────────────────────────────────────────────────────────── */
 function Icon({ lib = 'ion', name, size = 18, color = '#4a7a5a' }) {
@@ -31,8 +38,6 @@ const TEXT_MED    = '#4a7a5a';
 // Aliases để không phải đổi hết code bên dưới
 const TEXT_WHITE  = TEXT_DARK;
 const TEXT_DIM    = TEXT_MED;
-
-const DEFAULT_TANK_FULL_DIST = DEFAULT_TANK_FULL_DISTANCE;
 
 const VN_DAY = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
@@ -103,31 +108,49 @@ function aggDay(entries) {
 
 const VN_WEEKDAY = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
 
+function getWaterInfo(wDist, maxD, fullD) {
+  const pct = waterDistanceToPercent(wDist, maxD, fullD);
+  if (pct != null) {
+    return {
+      pct,
+      main: `${pct}%`,
+      status: pct >= 50 ? 'Đủ nước' : pct >= 25 ? 'Nước thấp' : 'Gần hết',
+      color: pct >= 50 ? '#4ade80' : pct >= 25 ? '#fbbf24' : '#f87171',
+      showBar: true,
+    };
+  }
+  if (wDist != null && Number.isFinite(Number(wDist))) {
+    return {
+      pct: null,
+      main: `${Math.round(Number(wDist) * 10) / 10} cm`,
+      status: 'Chưa hiệu chuẩn bể',
+      color: '#94a3b8',
+      showBar: false,
+    };
+  }
+  return null;
+}
+
 function HeroCard({ sensorData, pumpState, autoMode, maxWaterDist, tankFullDist }) {
   const temp  = sensorData?.temperature ?? null;
   const soil  = sensorData?.soilHum     ?? null;
   const air   = sensorData?.airHum      ?? null;
   const light = sensorData?.light       ?? null;
   const wDist = sensorData?.waterLevel  ?? null;
-  const wPct  = waterDistanceToPercent(wDist, maxWaterDist, tankFullDist);
+  const water = getWaterInfo(wDist, maxWaterDist, tankFullDist);
+  const watering = pumpState === 'on';
 
   // Date: "Thứ năm, 05 Tháng 6 2026"
   const now     = new Date();
   const dateStr = `${VN_WEEKDAY[now.getDay()]}, ${String(now.getDate()).padStart(2,'0')} Tháng ${now.getMonth()+1} ${now.getFullYear()}`;
 
   // Condition (right of date, like "Bright and Sunny")
+  const lightMeta = light != null ? lightLevelMeta(light) : null;
   const condIcon = light == null ? { lib: 'ion', name: 'cloud-outline' }
-    : light < 200   ? { lib: 'ion', name: 'moon-outline' }
-    : light < 1000  ? { lib: 'ion', name: 'partly-sunny-outline' }
-    : light < 5000  ? { lib: 'ion', name: 'partly-sunny-outline' }
-    : light < 15000 ? { lib: 'ion', name: 'sunny-outline' }
-    : { lib: 'ion', name: 'sunny' };
-  const condText = light == null    ? 'Đang đo...'
-    : light < 200   ? 'Trong nhà / tối'
-    : light < 1000  ? 'Ánh sáng yếu'
-    : light < 5000  ? 'Ánh sáng vừa'
-    : light < 15000 ? 'Ánh sáng tốt'
-    : 'Nắng mạnh';
+    : lightMeta?.label === 'Sáng' ? { lib: 'ion', name: 'sunny-outline' }
+    : lightMeta?.label === 'Tối' ? { lib: 'ion', name: 'moon-outline' }
+    : { lib: 'ion', name: 'partly-sunny-outline' };
+  const condText = formatLightCondition(light);
 
   // Plant health badge — solid background like the image
   const badge = soil == null
@@ -147,8 +170,8 @@ function HeroCard({ sensorData, pumpState, autoMode, maxWaterDist, tankFullDist 
     { lib: 'mci', icon: 'sprout',        label: 'Độ ẩm đất',
       num: soil  != null ? Math.round(soil)  : '--', unit: soil  != null ? '%'    : '' },
     { lib: 'ion', icon: 'sunny-outline', label: 'Ánh sáng',
-      num: light != null ? (light >= 1000 ? `${(light/1000).toFixed(1)}k` : Math.round(light)) : '--',
-      unit: light != null ? 'lux' : '' },
+      num: light != null ? formatLightLabel(light) : '--',
+      unit: '' },
     { lib: 'ion', icon: 'water-outline', label: 'Độ ẩm KK',
       num: air   != null ? Math.round(air)   : '--', unit: air   != null ? '% RH' : '' },
   ];
@@ -193,7 +216,7 @@ function HeroCard({ sensorData, pumpState, autoMode, maxWaterDist, tankFullDist 
             <Text style={hero.degUnit}>°C</Text>
           </Text>
           <Text style={hero.subLabel}>
-            {autoMode ? '🤖 Tự động' : pumpState === 'on' ? '💧 Đang tưới' : 'Nhiệt độ'}
+            {watering ? '💧 Đang tưới' : autoMode ? '🤖 Tự động' : 'Nhiệt độ'}
           </Text>
         </View>
 
@@ -223,14 +246,14 @@ function HeroCard({ sensorData, pumpState, autoMode, maxWaterDist, tankFullDist 
       </View>
 
       {/* Water pill */}
-      {wPct != null && (
+      {water && (
         <View style={[hero.waterPill, {
-          backgroundColor: wPct >= 50 ? 'rgba(74,222,128,0.2)' : wPct >= 25 ? 'rgba(251,191,36,0.2)' : 'rgba(248,113,113,0.2)',
+          backgroundColor: `${water.color}33`,
         }]}>
-          <MaterialCommunityIcons name="water-pump" size={14}
-            color={wPct >= 50 ? '#4ade80' : wPct >= 25 ? '#fbbf24' : '#f87171'} />
-          <Text style={[hero.waterTxt, { color: wPct >= 50 ? '#4ade80' : wPct >= 25 ? '#fbbf24' : '#f87171', marginLeft: 6 }]}>
-            Bể nước {wPct}%  ·  {wPct >= 50 ? 'Đủ nước' : wPct >= 25 ? 'Nước thấp' : 'Gần hết'}
+          <MaterialCommunityIcons name="water-pump" size={14} color={water.color} />
+          <Text style={[hero.waterTxt, { color: water.color, marginLeft: 6 }]}>
+            Bể nước {water.main}  ·  {water.status}
+            {watering ? '  ·  💧 Đang tưới' : ''}
           </Text>
         </View>
       )}
@@ -385,15 +408,13 @@ const HOURLY_SENSORS = [
   { key: 'temperature', label: 'Nhiệt độ', lib: 'mci', icon: 'thermometer',       unit: '°',    color: '#ef4444' },
   { key: 'soilHum',     label: 'Đ.A đất',  lib: 'mci', icon: 'sprout',            unit: '%',    color: '#22c55e' },
   { key: 'airHum',      label: 'Đ.A KK',   lib: 'ion', icon: 'water-outline',     unit: '%',    color: '#3b82f6' },
-  { key: 'light',       label: 'Ánh sáng', lib: 'ion', icon: 'sunny-outline',     unit: ' lux', color: '#f59e0b' },
+  { key: 'light',       label: 'Ánh sáng', lib: 'ion', icon: 'sunny-outline',     unit: '',    color: '#f59e0b' },
 ];
 
 function formatLiveReading(sensorKey, value) {
   const n = chartSafeNum(value);
   if (n == null) return '--';
-  if (sensorKey === 'light') {
-    return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n));
-  }
+  if (sensorKey === 'light') return formatLightLabel(n);
   return String(Math.round(n * 10) / 10);
 }
 
@@ -671,13 +692,15 @@ const wc = StyleSheet.create({
 
 /* ── Detail Cards (2-col grid, weather-app style) ────────────────────────── */
 
-function DetailCards({ sensorData, dailyData, maxWaterDist, tankFullDist }) {
+function DetailCards({ sensorData, dailyData, maxWaterDist, tankFullDist, pumpState, autoMode }) {
   const temp  = sensorData?.temperature ?? null;
   const soil  = sensorData?.soilHum     ?? null;
   const air   = sensorData?.airHum      ?? null;
   const light = sensorData?.light       ?? null;
   const wDist = sensorData?.waterLevel  ?? null;
-  const wPct  = waterDistanceToPercent(wDist, maxWaterDist, tankFullDist);
+  const water = getWaterInfo(wDist, maxWaterDist, tankFullDist);
+  const wPct  = water?.pct ?? null;
+  const watering = pumpState === 'on';
 
   const avg30 = useMemo(() => {
     if (!dailyData.length) return {};
@@ -698,12 +721,7 @@ function DetailCards({ sensorData, dailyData, maxWaterDist, tankFullDist }) {
     : soil < 75 ? { emoji: '🟢', text: 'Đất đủ ẩm\nchưa cần tưới',   color: '#4ade80' }
     :             { emoji: '🔵', text: 'Đất quá ướt\ntạm dừng tưới',  color: '#60a5fa' };
 
-  const lightLevel = light == null ? null
-    : light < 200   ? { label: 'Rất tối',       pct: 4,  color: '#818cf8' }
-    : light < 1000  ? { label: 'Ánh sáng yếu',  pct: 20, color: '#a78bfa' }
-    : light < 5000  ? { label: 'Ánh sáng vừa',  pct: 45, color: '#fbbf24' }
-    : light < 15000 ? { label: 'Ánh sáng tốt',  pct: 70, color: '#fb923c' }
-    :                 { label: 'Rất sáng',       pct: 94, color: '#fef3c7' };
+  const lightLevel = light != null ? lightLevelMeta(light) : null;
 
   const airStatus = air == null ? null
     : air < 40 ? 'Không khí khô ráo'
@@ -711,11 +729,11 @@ function DetailCards({ sensorData, dailyData, maxWaterDist, tankFullDist }) {
     : air < 75 ? 'Không khí hơi ẩm'
     : 'Không khí rất ẩm';
 
-  const wColor = wPct == null ? TEXT_WHITE
-    : wPct >= 50 ? '#4ade80'
-    : wPct >= 25 ? '#fbbf24'
-    : '#f87171';
-  const wLabel = wPct == null ? null
+  const wColor = water?.color ?? TEXT_WHITE;
+  const wLabel = water?.status ?? null;
+  const wDetail = wPct == null && wDist != null
+    ? 'Vào Cấu hình → Hiệu chuẩn bể để xem %'
+    : wPct == null ? null
     : wPct >= 50 ? 'Không cần lo lắng'
     : wPct >= 25 ? 'Chú ý, mực nước thấp'
     : 'Gần hết nước, cần đổ ngay';
@@ -756,9 +774,9 @@ function DetailCards({ sensorData, dailyData, maxWaterDist, tankFullDist }) {
         <View style={[dcs.card, { width: HALF }]}>
           <View style={dcs.labelRow}><Ionicons name="sunny-outline" size={13} color={TEXT_DIM} /><Text style={dcs.label}> ÁNH SÁNG</Text></View>
           <Text style={dcs.bigNum}>
-            {light != null ? (light > 999 ? `${(light / 1000).toFixed(1)}k` : `${Math.round(light)}`) : '--'}
+            {light != null ? formatLightLabel(light) : '--'}
           </Text>
-          <Text style={[dcs.sub, { marginBottom: 10 }]}>lux</Text>
+          <Text style={[dcs.sub, { marginBottom: 10 }]}>trạng thái</Text>
           {lightLevel && (
             <>
               {/* Gradient scale bar */}
@@ -791,32 +809,53 @@ function DetailCards({ sensorData, dailyData, maxWaterDist, tankFullDist }) {
       </View>
 
       {/* ─ Row 3: Mực nước bể (full width, ring gauge) ─ */}
-      {wPct != null && (
+      {water && (
         <View style={[dcs.card, { marginBottom: 8 }]}>
-          <View style={dcs.labelRow}><MaterialCommunityIcons name="water-pump" size={13} color={TEXT_DIM} /><Text style={dcs.label}> MỰC NƯỚC BỂ</Text></View>
+          <View style={dcs.labelRow}>
+            <MaterialCommunityIcons name="water-pump" size={13} color={TEXT_DIM} />
+            <Text style={dcs.label}> MỰC NƯỚC BỂ</Text>
+            <View style={[dcs.pumpBadge, watering ? dcs.pumpOn : dcs.pumpOff]}>
+              <Text style={[dcs.pumpBadgeTxt, { color: watering ? '#16a34a' : '#64748b' }]}>
+                {watering ? 'Đang tưới' : 'Không tưới'}
+              </Text>
+            </View>
+          </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18 }}>
             <View style={{ width: 78, height: 78, alignItems: 'center', justifyContent: 'center' }}>
-              <View style={[dcs.ring, { borderColor: '#ddeee5' }]} />
-              <View style={[dcs.ring, {
-                position: 'absolute',
-                borderTopColor:    wColor,
-                borderRightColor:  wPct > 25 ? wColor : 'transparent',
-                borderBottomColor: wPct > 50 ? wColor : 'transparent',
-                borderLeftColor:   wPct > 75 ? wColor : 'transparent',
-                transform: [{ rotate: '-45deg' }],
-              }]} />
-              <Text style={{ position: 'absolute', fontSize: 17, fontWeight: '800', color: TEXT_WHITE }}>
-                {wPct}%
+              {water.showBar ? (
+                <>
+                  <View style={[dcs.ring, { borderColor: '#ddeee5' }]} />
+                  <View style={[dcs.ring, {
+                    position: 'absolute',
+                    borderTopColor:    wColor,
+                    borderRightColor:  wPct > 25 ? wColor : 'transparent',
+                    borderBottomColor: wPct > 50 ? wColor : 'transparent',
+                    borderLeftColor:   wPct > 75 ? wColor : 'transparent',
+                    transform: [{ rotate: '-45deg' }],
+                  }]} />
+                </>
+              ) : (
+                <View style={[dcs.ring, { borderColor: '#cbd5e1' }]} />
+              )}
+              <Text style={{ position: 'absolute', fontSize: water.showBar ? 17 : 13, fontWeight: '800', color: TEXT_WHITE, textAlign: 'center' }}>
+                {water.main}
               </Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 22, fontWeight: '300', color: wColor, marginBottom: 4 }}>
-                {wPct >= 50 ? 'Đủ nước' : wPct >= 25 ? 'Nước thấp' : 'Gần hết'}
+                {wLabel}
               </Text>
-              <Text style={[dcs.sub, { lineHeight: 17 }]}>{wLabel}</Text>
-              <View style={{ height: 5, backgroundColor: '#e8f5ed', borderRadius: 999, marginTop: 10, overflow: 'hidden' }}>
-                <View style={{ width: `${wPct}%`, height: '100%', backgroundColor: wColor, borderRadius: 999 }} />
-              </View>
+              <Text style={[dcs.sub, { lineHeight: 17 }]}>{wDetail}</Text>
+              {autoMode && (
+                <Text style={[dcs.sub, { color: '#2563eb', marginTop: 4, fontWeight: '600' }]}>
+                  Chế độ tự động {watering ? '· bơm đang chạy' : '· chờ điều kiện'}
+                </Text>
+              )}
+              {water.showBar && (
+                <View style={{ height: 5, backgroundColor: '#e8f5ed', borderRadius: 999, marginTop: 10, overflow: 'hidden' }}>
+                  <View style={{ width: `${wPct}%`, height: '100%', backgroundColor: wColor, borderRadius: 999 }} />
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -853,8 +892,12 @@ function DetailCards({ sensorData, dailyData, maxWaterDist, tankFullDist }) {
 
 const dcs = StyleSheet.create({
   card:     { backgroundColor: CARD_BG, borderWidth: 1, borderColor: CARD_BORDER, borderRadius: 16, padding: 14, overflow: 'hidden', shadowColor: '#166534', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
-  labelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  label:    { fontSize: 11, color: TEXT_DIM, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase' },
+  labelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6, gap: 6 },
+  label:    { fontSize: 11, color: TEXT_DIM, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', flex: 1 },
+  pumpBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, borderWidth: 1 },
+  pumpOn:   { backgroundColor: '#dcfce7', borderColor: '#86efac' },
+  pumpOff:  { backgroundColor: '#f1f5f9', borderColor: '#e2e8f0' },
+  pumpBadgeTxt: { fontSize: 10, fontWeight: '700' },
   bigNum:   { fontSize: 36, fontWeight: '200', color: TEXT_WHITE, lineHeight: 40 },
   delta:    { fontSize: 13, fontWeight: '700', marginTop: 4 },
   sub:      { fontSize: 12, color: TEXT_DIM },
@@ -869,7 +912,7 @@ function SensorRow({ sensorData }) {
     { icon: '🌡️', label: 'Nhiệt độ', value: sensorData?.temperature, unit: '°C' },
     { icon: '🌱', label: 'Đ.A Đất',   value: sensorData?.soilHum,     unit: '%' },
     { icon: '💧', label: 'Đ.A KK',    value: sensorData?.airHum,      unit: '%' },
-    { icon: '☀️', label: 'Ánh sáng',  value: sensorData?.light,       unit: 'lux' },
+    { icon: '☀️', label: 'Ánh sáng',  value: sensorData?.light != null ? formatLightLabel(sensorData.light) : null, unit: '' },
   ];
 
   return (
@@ -946,11 +989,10 @@ function buildAlerts(sensorData, thresholds, maxWaterDist, tankFullDist) {
 
   const light = sensorData.light;
   if (typeof light === 'number' && light > maxLux) {
-    const lbl = light >= 1000 ? `${(light / 1000).toFixed(1)}k` : `${Math.round(light)}`;
     alerts.push({
       id: 'light-high', icon: '☀️', severity: light > maxLux * 1.2 ? 'danger' : 'warning',
       title: 'Ánh sáng quá mạnh',
-      body: `Cường độ sáng ${lbl} lux vượt ngưỡng ${(maxLux / 1000).toFixed(0)}k lux. Che bớt ánh nắng trực tiếp.`,
+      body: `Trạng thái ${formatLightLabel(light)} vượt ngưỡng cấu hình. Che bớt ánh nắng trực tiếp.`,
     });
   }
 
@@ -1061,71 +1103,13 @@ function AlertStrip({ sensorData, maxWaterDist, tankFullDist }) {
 /* ── Main Screen ───────────────────────────────────────────────────────────── */
 
 export default function DashboardScreen() {
-  const { sensorData, history, setHistory } = useMqtt();
+  const { sensorData, pumpState, autoMode } = useMqtt();
+  const { maxWaterDist, tankFullDist } = useTankCalibration();
   const [refreshing,    setRefreshing]    = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [maxWaterDist,  setMaxWaterDist]  = useState(null);
-  const [tankFullDist,  setTankFullDist]  = useState(null);
-  const [waterTankCalibrated, setWaterTankCalibrated] = useState(false);
   const [todayEntries, setTodayEntries] = useState([]);
   const [dailyData,     setDailyData]     = useState([]);
   const [historyDetail, setHistoryDetail] = useState(null);
-  const tankMigrateRef = useRef(false);
-
-  // Hiệu chuẩn bể: AsyncStorage giữ giá trị local; Firebase chỉ ghi đè khi tankCalibrated=true
-  useEffect(() => {
-    (async () => {
-      try {
-        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-        const [emptyV, fullV, calibV] = await Promise.all([
-          AsyncStorage.getItem('iot_max_water_distance'),
-          AsyncStorage.getItem('iot_tank_full_distance'),
-          AsyncStorage.getItem(WATER_CALIBRATION_KEY),
-        ]);
-        if (emptyV) setMaxWaterDist(Number(emptyV));
-        if (fullV) setTankFullDist(Number(fullV));
-        if (calibV === 'true') setWaterTankCalibrated(true);
-      } catch {}
-    })();
-
-    const unsub = firebaseService.subscribeConfig(async (cfg) => {
-      const { thresholds, tankEmpty, tankFull, tankCalibrated } = splitDeviceConfig(cfg);
-      if (tankCalibrated) {
-        try {
-          const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-          if (tankEmpty != null && tankEmpty > 0) {
-            setMaxWaterDist(tankEmpty);
-            await AsyncStorage.setItem('iot_max_water_distance', String(tankEmpty));
-          }
-          if (tankFull != null && tankFull >= 0) {
-            setTankFullDist(tankFull);
-            await AsyncStorage.setItem('iot_tank_full_distance', String(tankFull));
-          }
-          setWaterTankCalibrated(true);
-          await AsyncStorage.setItem(WATER_CALIBRATION_KEY, 'true');
-        } catch {}
-        return;
-      }
-
-      if (tankMigrateRef.current) return;
-      try {
-        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-        const calibV = await AsyncStorage.getItem(WATER_CALIBRATION_KEY);
-        if (calibV !== 'true') return;
-        const emptyV = await AsyncStorage.getItem('iot_max_water_distance');
-        const fullV = await AsyncStorage.getItem('iot_tank_full_distance');
-        const empty = emptyV ? Number(emptyV) : 0;
-        const full = fullV ? Number(fullV) : DEFAULT_TANK_FULL_DISTANCE;
-        if (empty > 0) {
-          tankMigrateRef.current = true;
-          await firebaseService.saveConfig(
-            buildFirebaseConfigPayload(thresholds, empty, full, true),
-          );
-        }
-      } catch {}
-    });
-    return unsub;
-  }, []);
 
   const loadChartData = useCallback(async () => {
     try {
@@ -1159,8 +1143,6 @@ export default function DashboardScreen() {
     setRefreshing(false);
   }, [loadChartData]);
 
-  const { pumpState, autoMode } = useMqtt();
-
   if (initialLoading) {
     return (
       <View style={{ flex: 1, backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center' }}>
@@ -1193,6 +1175,8 @@ export default function DashboardScreen() {
             tankFullDist={tankFullDist}
           />
 
+          <WateringStatusBar pumpState={pumpState} autoMode={autoMode} />
+
           {/* Hourly strip */}
           <TodayTrendChart
             todayEntries={todayEntries}
@@ -1215,6 +1199,8 @@ export default function DashboardScreen() {
             dailyData={dailyData}
             maxWaterDist={maxWaterDist}
             tankFullDist={tankFullDist}
+            pumpState={pumpState}
+            autoMode={autoMode}
           />
 
           {/* Cảnh báo môi trường */}

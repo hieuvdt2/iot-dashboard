@@ -1,6 +1,4 @@
-const fmt = (value, unit = '') => (
-  value === null || value === undefined ? '--' : `${value}${unit}`
-);
+import { formatLightLabel } from './lightDisplay';
 
 const buildSoilAlert = (soil, minSoil) => {
   if (typeof soil !== 'number' || typeof minSoil !== 'number') return null;
@@ -67,15 +65,15 @@ const buildLightAlert = (light, maxLux) => {
     id: 'light-high',
     icon: 'sun',
     title: 'Ánh sáng quá mạnh',
-    short: `${light >= 1000 ? `${(light / 1000).toFixed(1)}k` : light} lux`,
+    short: formatLightLabel(light),
     severity: light > maxLux * 1.2 ? 'danger' : 'warning',
-    detail: `Cường độ sáng ${fmt(light, ' lux')} vượt ngưỡng ${maxLux.toLocaleString()} lux.`,
+    detail: `Trạng thái ${formatLightLabel(light)} — vượt ngưỡng cấu hình.`,
     advice: 'Che bớt ánh nắng trực tiếp hoặc chuyển chậu sang vị trí rọi sáng vừa phải.',
     metric: {
       label: 'Ánh sáng',
-      current: light,
-      unit: ' lux',
-      threshold: `≤ ${maxLux.toLocaleString()} lux`,
+      current: formatLightLabel(light),
+      unit: '',
+      threshold: 'Theo cấu hình',
     },
   };
 };

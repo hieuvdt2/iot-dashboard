@@ -4,7 +4,7 @@ export const SENSOR_KEYS = [
   { key: 'nhiet_do',        label: 'Nhiệt độ (°C)',   color: '#ff6b6b' },
   { key: 'do_am_khong_khi', label: 'Độ ẩm KK (%)',    color: '#4dabf7' },
   { key: 'do_am_dat',       label: 'Độ ẩm đất (%)',   color: '#51cf66' },
-  { key: 'anh_sang',        label: 'Ánh sáng (lux)',  color: '#ffa94d' },
+  { key: 'anh_sang',        label: 'Ánh sáng',        color: '#ffa94d' },
   { key: 'muc_nuoc',        label: 'Mực nước bể (%)', color: '#ffd43b' },
 ];
 
