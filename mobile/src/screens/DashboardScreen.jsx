@@ -10,6 +10,7 @@ import { useMqtt } from '../MqttContext';
 import { firebaseService } from '../services/firebaseService';
 import HistoryDetailSheet from '../components/HistoryDetailSheet';
 import WeatherDayChart from '../components/WeatherDayChart';
+import WateringStatusBar from '../components/WateringStatusBar';
 import { hourly24Filled, sliceHourlyWindow, seriesMinMax, safeNum as chartSafeNum } from '../utils/dayChart';
 import { waterDistanceToPercent } from '../utils/waterLevel';
 import { useTankCalibration } from '../hooks/useTankCalibration';
@@ -124,44 +125,6 @@ function getWaterInfo(wDist, maxD, fullD) {
   }
   return null;
 }
-
-function WateringStatusBar({ pumpState, autoMode }) {
-  const watering = pumpState === 'on';
-  return (
-    <View style={ws.bar}>
-      <View style={[ws.chip, watering ? ws.chipOn : ws.chipOff]}>
-        <MaterialCommunityIcons
-          name="water-pump"
-          size={18}
-          color={watering ? '#16a34a' : '#64748b'}
-        />
-        <Text style={[ws.chipTxt, { color: watering ? '#16a34a' : '#64748b' }]}>
-          {watering ? 'Đang tưới' : 'Không tưới'}
-        </Text>
-      </View>
-      <View style={[ws.chip, autoMode ? ws.chipAuto : ws.chipManual]}>
-        <MaterialCommunityIcons
-          name={autoMode ? 'robot-outline' : 'hand-back-right-outline'}
-          size={16}
-          color={autoMode ? '#2563eb' : '#64748b'}
-        />
-        <Text style={[ws.chipTxt, { color: autoMode ? '#2563eb' : '#64748b' }]}>
-          {autoMode ? 'Tự động' : 'Thủ công'}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-const ws = StyleSheet.create({
-  bar: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginHorizontal: 16, marginBottom: 12 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, borderWidth: 1 },
-  chipOn: { backgroundColor: '#dcfce7', borderColor: '#86efac' },
-  chipOff: { backgroundColor: '#fff', borderColor: '#dce8e0' },
-  chipAuto: { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' },
-  chipManual: { backgroundColor: '#fff', borderColor: '#dce8e0' },
-  chipTxt: { fontSize: 13, fontWeight: '700' },
-});
 
 function HeroCard({ sensorData, pumpState, autoMode, maxWaterDist, tankFullDist }) {
   const temp  = sensorData?.temperature ?? null;

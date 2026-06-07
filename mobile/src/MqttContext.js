@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useRef, useState, useCallb
 import MqttService from './services/mqttService';
 import { firebaseService } from './services/firebaseService';
 import { normalizeSensorPayload, mergeSensorSnapshot } from './utils/normalizeSensor';
+import { applyDeviceStatus } from './utils/deviceStatus';
 
 const MqttContext = createContext(null);
 
@@ -33,6 +34,10 @@ export function MqttProvider({ children }) {
       });
     });
 
+    mqtt.on('deviceStatus', (raw) => {
+      applyDeviceStatus(raw, setPumpState, setAutoMode);
+    });
+
     mqtt.on('pumpStatus', (s) => {
       if (s === 'DANG_TUOI' || s === 'on' || s === 1) setPumpState('on');
       else setPumpState('off');
@@ -46,12 +51,14 @@ export function MqttProvider({ children }) {
 
     firebaseService.getLatestSensorData().then((data) => {
       if (!data) return;
+      applyDeviceStatus(data, setPumpState, setAutoMode);
       const n = normalizeSensorPayload(data);
       setSensorData((prev) => mergeSensorSnapshot(prev, n));
     }).catch(() => {});
 
     const unsubFirebase = firebaseService.subscribeLatest((data) => {
       if (!data) return;
+      applyDeviceStatus(data, setPumpState, setAutoMode);
       const n = normalizeSensorPayload(data);
       setSensorData((prev) => mergeSensorSnapshot(prev, n));
     });

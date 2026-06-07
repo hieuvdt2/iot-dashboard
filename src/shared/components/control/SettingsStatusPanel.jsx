@@ -51,7 +51,8 @@ function PumpStatusCard({ isOn, label }) {
       <div className="settings-stat-body">
         <span className="settings-stat-label">Máy bơm</span>
         <span className={`settings-stat-value ${isOn ? 'on' : 'off'}`}>
-          {isOn ? 'Đang chạy' : 'Đang tắt'}
+          {isOn ? 'Đang tưới' : 'Không tưới'}
+          {isOn && <span className="pump-live-dot" aria-hidden />}
         </span>
         <span className="settings-stat-sub">{label || '---'}</span>
       </div>

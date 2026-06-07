@@ -76,11 +76,16 @@ export default class MqttService {
           const raw = JSON.parse(message.toString());
           const data = normalizeSensorPayload(raw);
           this._emit('sensorData', data);
-          if (raw.pumpStatus !== undefined) {
-            this._emit('pumpStatus', raw.pumpStatus);
+          this._emit('deviceStatus', raw);
+          const pump = raw.pumpStatus ?? raw.trang_thai_bom
+            ?? (raw.pump === true ? 'DANG_TUOI' : raw.pump === false ? 'KHONG_TUOI' : undefined);
+          if (pump !== undefined) {
+            this._emit('pumpStatus', pump);
           }
-          if (raw.autoMode !== undefined) {
-            this._emit('autoMode', raw.autoMode);
+          const auto = raw.autoMode ?? raw.auto_mode
+            ?? (raw.auto === true ? 'BAT' : raw.auto === false ? 'TAT' : undefined);
+          if (auto !== undefined) {
+            this._emit('autoMode', auto);
           }
         } catch (e) {
           console.warn('[MQTT] Parse error:', e.message);
