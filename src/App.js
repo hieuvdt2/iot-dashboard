@@ -26,6 +26,8 @@ import {
   buildMqttConfigPayload,
   getWaterLevelStatus,
   isWaterTankCalibrated,
+  loadStoredTankEmptyDistance,
+  loadStoredTankFullDistance,
   markWaterTankCalibrated,
   pickPlantThresholds,
   splitDeviceConfig,
@@ -41,8 +43,6 @@ const DEFAULT_CONFIG = {
 };
 
 // maxWaterDistance là cài đặt phần cứng (kích thước bể), không phải thuộc tính cây
-const DEFAULT_MAX_WATER_DISTANCE = 20;
-
 const THRESHOLD_KEYS = [
   'minSoil',
   'targetSoil',
@@ -203,18 +203,8 @@ function App() {
   });
   const [deployedThresholds, setDeployedThresholds] = useState(loadStoredThresholds);
   const [draftThresholds, setDraftThresholds] = useState(loadStoredThresholds);
-  const [maxWaterDistance, setMaxWaterDistance] = useState(() => {
-    try {
-      const v = localStorage.getItem('iot_max_water_distance');
-      return v ? Number(v) : DEFAULT_MAX_WATER_DISTANCE;
-    } catch { return DEFAULT_MAX_WATER_DISTANCE; }
-  });
-  const [tankFullDistance, setTankFullDistance] = useState(() => {
-    try {
-      const v = localStorage.getItem('iot_tank_full_distance');
-      return v ? Number(v) : DEFAULT_TANK_FULL_DISTANCE;
-    } catch { return DEFAULT_TANK_FULL_DISTANCE; }
-  });
+  const [maxWaterDistance, setMaxWaterDistance] = useState(loadStoredTankEmptyDistance);
+  const [tankFullDistance, setTankFullDistance] = useState(loadStoredTankFullDistance);
   const [waterTankCalibrated, setWaterTankCalibrated] = useState(isWaterTankCalibrated);
 
   const handleMarkWaterCalibrated = useCallback(() => {
@@ -767,7 +757,7 @@ function App() {
   const autoModeLabel = autoModeLabelMap[autoMode] || autoMode || '---';
   const pumpOn = pumpStatus === 'DANG_TUOI';
   const waterDistance = sensorData?.muc_nuoc ?? null;
-  const waterPct = waterDistanceToPercent(waterDistance, maxWaterDistance, tankFullDistance) ?? 0;
+  const waterPct = waterDistanceToPercent(waterDistance, maxWaterDistance, tankFullDistance);
   const waterLevelStatus = getWaterLevelStatus(waterDistance, maxWaterDistance, tankFullDistance);
   const waterStatus = waterDistance === null ? null : (waterLevelStatus?.key ?? null);
   const waterStatusLabel = { full: 'Đủ nước', low: 'Nước thấp', empty: 'Cạn', null: '--' }[waterStatus];

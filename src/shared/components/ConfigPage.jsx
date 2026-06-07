@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import AppIcon, { IconHeading } from './AppIcon';
 import {
   formatCmForInput,
@@ -107,24 +107,34 @@ function ConfigPage({
   const [presetFieldErrors, setPresetFieldErrors] = useState({});
   const [confirmState, setConfirmState] = useState(null);
   const [tankUnit, setTankUnit] = useState(loadTankDistanceUnit);
-  const [draftEmptyCm, setDraftEmptyCm] = useState(maxWaterDistance ?? 20);
-  const [draftFullCm, setDraftFullCm] = useState(tankFullDistance ?? 2);
-  const [emptyText, setEmptyText] = useState(() => formatCmForInput(maxWaterDistance ?? 20, loadTankDistanceUnit()));
-  const [fullText, setFullText] = useState(() => formatCmForInput(tankFullDistance ?? 2, loadTankDistanceUnit()));
+  const [draftEmptyCm, setDraftEmptyCm] = useState(maxWaterDistance ?? null);
+  const [draftFullCm, setDraftFullCm] = useState(tankFullDistance ?? null);
+  const [emptyText, setEmptyText] = useState(() => (
+    maxWaterDistance != null ? formatCmForInput(maxWaterDistance, loadTankDistanceUnit()) : ''
+  ));
+  const [fullText, setFullText] = useState(() => (
+    tankFullDistance != null ? formatCmForInput(tankFullDistance, loadTankDistanceUnit()) : ''
+  ));
   const [savingTank, setSavingTank] = useState(false);
+  const tankUnitRef = useRef(tankUnit);
+  tankUnitRef.current = tankUnit;
 
   useEffect(() => {
-    setDraftEmptyCm(maxWaterDistance ?? 20);
-    setDraftFullCm(tankFullDistance ?? 2);
-    setEmptyText(formatCmForInput(maxWaterDistance ?? 20, tankUnit));
-    setFullText(formatCmForInput(tankFullDistance ?? 2, tankUnit));
+    setDraftEmptyCm(maxWaterDistance ?? null);
+    setDraftFullCm(tankFullDistance ?? null);
+    setEmptyText(
+      maxWaterDistance != null ? formatCmForInput(maxWaterDistance, tankUnitRef.current) : '',
+    );
+    setFullText(
+      tankFullDistance != null ? formatCmForInput(tankFullDistance, tankUnitRef.current) : '',
+    );
   }, [maxWaterDistance, tankFullDistance]);
 
   const hasUnsavedTank = !tankConfigEqual(
     draftEmptyCm,
     draftFullCm,
-    maxWaterDistance ?? 20,
-    tankFullDistance ?? 2,
+    maxWaterDistance,
+    tankFullDistance,
   );
 
   const handleTankUnitChange = (unit) => {
@@ -751,10 +761,10 @@ function ConfigPage({
             </div>
 
             <label className="water-tank-field">
-              <span className="water-tank-label">Chiều cao bể ({tankUnit})</span>
+              <span className="water-tank-label">Mức cạn (0%) — chiều cao bể ({tankUnit})</span>
               <p className="water-tank-hint">
-                Đo bằng thước từ đáy lên mặt cảm biến (HC-SR04 gắn trên đỉnh bể). Dùng làm mốc <strong>0%</strong> khi bể cạn.
-                {tankUnit === 'm' && ' Arduino vẫn gửi muc_nuoc theo cm — app tự quy đổi.'}
+                Số <strong>muc_nuoc</strong> khi bể hết nước (hoặc đo thước từ đáy lên cảm biến). Bể 10 m thì nhập <strong>10 {tankUnit}</strong>.
+                {tankUnit === 'm' && ' Arduino gửi cm — app tự quy đổi.'}
               </p>
               <div className="water-tank-input-row">
                 <input
@@ -766,15 +776,18 @@ function ConfigPage({
                   value={emptyText}
                   onChange={(e) => handleEmptyInput(e.target.value)}
                   disabled={!canEdit}
+                  placeholder="Chưa cấu hình"
                 />
                 <span className="water-tank-unit">{tankUnit}</span>
               </div>
             </label>
 
             <label className="water-tank-field">
-              <span className="water-tank-label">Khoảng cách khi bể đầy (100%)</span>
+              <span className="water-tank-label">Mức đủ nước (100%)</span>
               <p className="water-tank-hint">
-                Giá trị <strong>muc_nuoc</strong> khi nước sát cảm biến — thường <strong>{tankUnit === 'm' ? '0.02–0.03 m' : '2–3 cm'}</strong>.
+                Số <strong>muc_nuoc</strong> khi bạn coi bể <strong>đã đủ nước</strong> (không nhất thiết đổ tới miệng).
+                Bể nhỏ: thường <strong>{tankUnit === 'm' ? '0,02–0,03 m' : '2–3 cm'}</strong>.
+                Bể cao (vd. chỉ đổ tới 7 m trong bể 10 m): nhập khoảng cách cảm biến lúc đủ nước (vd. <strong>3 {tankUnit}</strong>).
               </p>
               <div className="water-tank-input-row">
                 <input
@@ -786,6 +799,7 @@ function ConfigPage({
                   value={fullText}
                   onChange={(e) => handleFullInput(e.target.value)}
                   disabled={!canEdit}
+                  placeholder="Chưa cấu hình"
                 />
                 <span className="water-tank-unit">{tankUnit}</span>
               </div>
@@ -805,8 +819,8 @@ function ConfigPage({
             <div className="water-tank-calib">
               <p className="water-tank-calib-title"><strong>Hiệu chuẩn nhanh</strong> (tùy chọn — chính xác hơn đo thước):</p>
               <ol className="water-tank-calib-steps">
-                <li>Nhập <strong>chiều cao bể</strong> rồi bấm <strong>Lưu</strong>, hoặc đổ hết nước → bấm &quot;Ghi mức cạn&quot;</li>
-                <li>Đổ <strong>đầy bể</strong>, chờ ổn định → bấm &quot;Ghi mức đầy&quot;</li>
+                <li>Đổ <strong>cạn</strong> → bấm &quot;Ghi mức cạn&quot;, hoặc nhập chiều cao bể rồi <strong>Lưu</strong></li>
+                <li>Đổ <strong>đủ nước theo ý bạn</strong> → bấm &quot;Ghi mức đủ nước&quot;</li>
               </ol>
               {sensorData?.muc_nuoc != null && canEdit && (
                 <div className="water-tank-calib-btns">
@@ -822,7 +836,7 @@ function ConfigPage({
                     className="water-tank-calib-btn water-tank-calib-btn--full"
                     onClick={() => applyTankFromSensor(Number(sensorData.muc_nuoc), 'full')}
                   >
-                    Ghi {formatDistanceLabel(sensorData.muc_nuoc, tankUnit)} → mức đầy (100%)
+                    Ghi {formatDistanceLabel(sensorData.muc_nuoc, tankUnit)} → mức đủ nước (100%)
                   </button>
                 </div>
               )}
@@ -835,7 +849,7 @@ function ConfigPage({
 
             <div className="water-tank-note">
               <p>
-                Công thức: <strong>% = (chiều cao bể − muc_nuoc hiện tại) / (chiều cao bể − mức đầy) × 100</strong>
+                Công thức: <strong>% = (mức cạn − muc_nuoc) / (mức cạn − mức đủ nước) × 100</strong>
               </p>
               <p>
                 <strong>muc_nuoc</strong> là khoảng cách siêu âm đo được (<code>duration × 0.034 / 2</code> cm).

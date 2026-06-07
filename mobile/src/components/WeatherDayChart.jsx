@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
 import { LineChart } from 'react-native-gifted-charts';
 import {
-  hourly24Filled,
+  hourly24WithLive,
+  sliceHourlyWindow,
   computeYRange,
   seriesMinMax,
   buildOverlayChart,
@@ -12,6 +13,20 @@ import {
 
 const { width: SW } = Dimensions.get('window');
 const CHART_W = SW - 52;
+
+function useCurrentChartHour() {
+  const [hour, setHour] = useState(() => new Date().getHours());
+  useEffect(() => {
+    const tick = () => {
+      const h = new Date().getHours();
+      setHour((prev) => (prev !== h ? h : prev));
+    };
+    tick();
+    const id = setInterval(tick, 30_000);
+    return () => clearInterval(id);
+  }, []);
+  return hour;
+}
 
 /**
  * Biểu đồ 24h trái → phải, kiểu Apple Weather.
@@ -29,16 +44,33 @@ export default function WeatherDayChart({
   loading = false,
   liveValue = null,
   fallbackAvg = null,
-  height = 210,
+  height = 250,
   showHero = true,
+  showLegend,
+  hourWindow = 'full24',
+  recentHours = 8,
 }) {
+  const liveSeedRef = useRef(null);
+  const liveRef = useRef(liveValue);
+  liveRef.current = liveValue;
+  const chartHour = useCurrentChartHour();
+
+  const selectedPtsFull = useMemo(
+    () => hourly24WithLive(selectedEntries, sensorKey, liveRef.current, liveSeedRef, chartHour),
+    [selectedEntries, sensorKey, chartHour],
+  );
+  const comparePtsFull = useMemo(
+    () => hourly24WithLive(compareEntries, sensorKey, null, null, chartHour),
+    [compareEntries, sensorKey, chartHour],
+  );
+
   const selectedPts = useMemo(
-    () => hourly24Filled(selectedEntries, sensorKey, fallbackAvg),
-    [selectedEntries, sensorKey, fallbackAvg],
+    () => sliceHourlyWindow(selectedPtsFull, hourWindow, chartHour, recentHours),
+    [selectedPtsFull, hourWindow, chartHour, recentHours],
   );
   const comparePts = useMemo(
-    () => hourly24Filled(compareEntries, sensorKey, null),
-    [compareEntries, sensorKey],
+    () => sliceHourlyWindow(comparePtsFull, hourWindow, chartHour, recentHours),
+    [comparePtsFull, hourWindow, chartHour, recentHours],
   );
 
   const chart = useMemo(
@@ -52,11 +84,13 @@ export default function WeatherDayChart({
   );
 
   const stats = useMemo(() => seriesMinMax(selectedPts), [selectedPts]);
-  const hasData = chart.selectedCount >= 1 || fallbackAvg != null;
+  const hasData = chart.selectedCount >= 1 || safeNum(liveValue) != null || fallbackAvg != null;
   const hasCompare = showCompare && chart.compareCount >= 1;
+  const legendVisible = showLegend ?? (hasCompare || showCompare);
 
   const displayVal = safeNum(liveValue) ?? safeNum(fallbackAvg);
-  const spacing = Math.max(8, (CHART_W - 32) / 23);
+  const pointCount = Math.max(1, chart.selected.length);
+  const spacing = Math.max(10, (CHART_W - 32) / Math.max(pointCount - 1, 1));
   const dim = dimColor(color, 0.58);
 
   const dataSet = [];
@@ -101,7 +135,7 @@ export default function WeatherDayChart({
         </View>
       )}
 
-      {(hasCompare || hasData) && (
+      {legendVisible && (hasCompare || hasData) && (
         <View style={s.legend}>
           {hasCompare && (
             <View style={s.legendItem}>
@@ -130,7 +164,10 @@ export default function WeatherDayChart({
             initialSpacing={12}
             endSpacing={16}
             curved
+            curvature={0.15}
             maxValue={yMax}
+            overflowTop={18}
+            overflowBottom={4}
             noOfSections={4}
             yAxisSide="right"
             yAxisTextStyle={s.axisY}
@@ -175,7 +212,7 @@ const s = StyleSheet.create({
   legendDash: { width: 18, height: 0, borderTopWidth: 2, borderStyle: 'dashed' },
   legendSolid: { width: 18, height: 3, borderRadius: 2 },
   legendTxt: { fontSize: 11, color: '#8ab49a' },
-  chartBox: { alignItems: 'center', marginTop: 4 },
+  chartBox: { alignItems: 'center', marginTop: 4, paddingTop: 6, overflow: 'visible' },
   loader: { paddingVertical: 48 },
   empty: { textAlign: 'center', color: '#8ab49a', fontSize: 13, paddingVertical: 36 },
   axisY: { fontSize: 10, color: '#8ab49a', fontWeight: '500' },

@@ -28,7 +28,7 @@ function WaterLevelGauge({ waterPct, statusLabel, statusIcon, statusColor, hasDa
         <span className="settings-stat-label">Mức nước bể</span>
         <span className="settings-stat-value">{hasData ? `${waterPct}%` : '--'}</span>
         <span className="settings-stat-sub">
-          {hasData ? 'Quy đổi từ cảm biến siêu âm' : 'Chưa có dữ liệu'}
+          {hasData ? 'Quy đổi từ cảm biến siêu âm' : 'Chưa cấu hình bể — vào Cấu hình'}
         </span>
         {statusLabel && (
           <span className="settings-stat-badge" style={{ color: statusColor }}>
@@ -108,8 +108,8 @@ export default function SettingsStatusPanel({
   return (
     <div className="settings-status-panel">
       <WaterLevelGauge
-        waterPct={waterPct}
-        hasData={waterDistance !== null}
+        waterPct={waterPct ?? 0}
+        hasData={waterPct != null}
         statusLabel={waterStatusLabel}
         statusIcon={waterStatusIcon}
         statusColor={waterStatusColor}

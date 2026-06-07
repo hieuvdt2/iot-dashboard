@@ -10,6 +10,7 @@ import { useMqtt } from '../MqttContext';
 import { firebaseService } from '../services/firebaseService';
 import HistoryDetailSheet from '../components/HistoryDetailSheet';
 import WeatherDayChart from '../components/WeatherDayChart';
+import { hourly24Filled, sliceHourlyWindow, seriesMinMax, safeNum as chartSafeNum } from '../utils/dayChart';
 import { buildFirebaseConfigPayload, DEFAULT_TANK_FULL_DISTANCE, splitDeviceConfig, WATER_CALIBRATION_KEY, waterDistanceToPercent } from '../utils/waterLevel';
 
 /* ── Icon helper ─────────────────────────────────────────────────────────── */
@@ -31,7 +32,6 @@ const TEXT_MED    = '#4a7a5a';
 const TEXT_WHITE  = TEXT_DARK;
 const TEXT_DIM    = TEXT_MED;
 
-const DEFAULT_MAX_WATER_DIST = 20;
 const DEFAULT_TANK_FULL_DIST = DEFAULT_TANK_FULL_DISTANCE;
 
 const VN_DAY = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
@@ -109,9 +109,7 @@ function HeroCard({ sensorData, pumpState, autoMode, maxWaterDist, tankFullDist 
   const air   = sensorData?.airHum      ?? null;
   const light = sensorData?.light       ?? null;
   const wDist = sensorData?.waterLevel  ?? null;
-  const maxD  = maxWaterDist ?? DEFAULT_MAX_WATER_DIST;
-  const fullD = tankFullDist ?? DEFAULT_TANK_FULL_DIST;
-  const wPct  = waterDistanceToPercent(wDist, maxD, fullD);
+  const wPct  = waterDistanceToPercent(wDist, maxWaterDist, tankFullDist);
 
   // Date: "Thứ năm, 05 Tháng 6 2026"
   const now     = new Date();
@@ -372,13 +370,6 @@ const sg = StyleSheet.create({
   },
 });
 
-function offsetLocalDateKey(dateKey, delta) {
-  const [y, m, d] = dateKey.split('-').map(Number);
-  const dt = new Date(y, m - 1, d, 12, 0, 0, 0);
-  dt.setDate(dt.getDate() + delta);
-  return localDateKey(dt.getTime());
-}
-
 async function loadEntriesForDate(dateKey) {
   const data = await firebaseService.getHistoryForDate(dateKey);
   if (!data) return [];
@@ -391,56 +382,140 @@ async function loadEntriesForDate(dateKey) {
 /* ── Biểu đồ 24h hôm nay (Apple Weather style) ───────────────────────────── */
 
 const HOURLY_SENSORS = [
-  { key: 'temperature', lib: 'mci', icon: 'thermometer',       unit: '°',  color: '#ef4444' },
-  { key: 'soilHum',     lib: 'mci', icon: 'sprout',            unit: '%',  color: '#22c55e' },
-  { key: 'airHum',      lib: 'ion', icon: 'water-outline',     unit: '%',  color: '#3b82f6' },
-  { key: 'light',       lib: 'ion', icon: 'sunny-outline',     unit: '',   color: '#f59e0b' },
+  { key: 'temperature', label: 'Nhiệt độ', lib: 'mci', icon: 'thermometer',       unit: '°',    color: '#ef4444' },
+  { key: 'soilHum',     label: 'Đ.A đất',  lib: 'mci', icon: 'sprout',            unit: '%',    color: '#22c55e' },
+  { key: 'airHum',      label: 'Đ.A KK',   lib: 'ion', icon: 'water-outline',     unit: '%',    color: '#3b82f6' },
+  { key: 'light',       label: 'Ánh sáng', lib: 'ion', icon: 'sunny-outline',     unit: ' lux', color: '#f59e0b' },
 ];
 
-function TodayTrendChart({ todayEntries, yesterdayEntries, sensorData }) {
+function formatLiveReading(sensorKey, value) {
+  const n = chartSafeNum(value);
+  if (n == null) return '--';
+  if (sensorKey === 'light') {
+    return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n));
+  }
+  return String(Math.round(n * 10) / 10);
+}
+
+function TodayTrendChart({ todayEntries, sensorData, onOpenDetail }) {
   const [activeSensor, setActiveSensor] = useState('temperature');
   const meta = HOURLY_SENSORS.find((s) => s.key === activeSensor) ?? HOURLY_SENSORS[0];
   const liveValue = sensorData?.[activeSensor] ?? null;
 
+  const dayStats = useMemo(
+    () => seriesMinMax(
+      sliceHourlyWindow(
+        hourly24Filled(todayEntries, activeSensor, null),
+        'recent',
+        new Date().getHours(),
+        8,
+      ),
+    ),
+    [todayEntries, activeSensor],
+  );
+
+  const openDetail = () => {
+    if (!onOpenDetail) return;
+    onOpenDetail({ dateKey: localDateKey(Date.now()), sensorKey: activeSensor });
+  };
+
   return (
-    <GlassCard>
+    <View style={hs.card}>
       <View style={hs.header}>
-        <Text style={hs.headerTitle}>📈 DIỄN BIẾN HÔM NAY</Text>
-        <Text style={hs.headerSub}>Trái → phải theo giờ · Hôm qua nét đứt</Text>
+        <View style={hs.headerRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={hs.headerTitle}>Hôm nay</Text>
+            <Text style={hs.headerSub}>8 giờ gần nhất · Giá trị live</Text>
+          </View>
+          {onOpenDetail && (
+            <TouchableOpacity style={hs.detailBtn} onPress={openDetail} hitSlop={8}>
+              <Text style={hs.detailBtnTxt}>Chi tiết</Text>
+              <Ionicons name="chevron-forward" size={14} color="#22c55e" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
-      <SensorSegmentBar
-        sensors={HOURLY_SENSORS}
-        activeKey={activeSensor}
-        onSelect={setActiveSensor}
-        showLabel={false}
-      />
-
-      <View style={hs.divider} />
-
-      <View style={hs.chartWrap}>
-        <WeatherDayChart
-          selectedEntries={todayEntries}
-          compareEntries={yesterdayEntries}
-          sensorKey={activeSensor}
-          color={meta.color}
-          unit={meta.unit}
-          liveValue={liveValue}
-          selectedLabel="Hôm nay"
-          compareLabel="Hôm qua"
-          showCompare={yesterdayEntries.length > 0}
+      <View style={hs.tabsWrap}>
+        <SensorSegmentBar
+          sensors={HOURLY_SENSORS}
+          activeKey={activeSensor}
+          onSelect={setActiveSensor}
+          showLabel
         />
       </View>
-    </GlassCard>
+
+      <View style={hs.hero}>
+        <Text style={[hs.heroVal, { color: meta.color }]}>
+          {formatLiveReading(activeSensor, liveValue)}
+          {chartSafeNum(liveValue) != null ? meta.unit : ''}
+        </Text>
+        <Text style={hs.heroLbl}>Giá trị hiện tại</Text>
+        {dayStats.min != null && dayStats.max != null && (
+          <Text style={hs.heroRange}>
+            T:{dayStats.min}{meta.unit.trim() || meta.unit}  ·  C:{dayStats.max}{meta.unit.trim() || meta.unit} (8h qua)
+          </Text>
+        )}
+      </View>
+
+      <View style={hs.chartCard}>
+        <WeatherDayChart
+          selectedEntries={todayEntries}
+          compareEntries={[]}
+          sensorKey={activeSensor}
+          color={meta.color}
+          unit={meta.unit.trim() || meta.unit}
+          liveValue={liveValue}
+          selectedLabel="Hôm nay"
+          showCompare={false}
+          showHero={false}
+          showLegend={false}
+          hourWindow="recent"
+          recentHours={8}
+        />
+      </View>
+    </View>
   );
 }
 
 const hs = StyleSheet.create({
-  header:     { padding: 12, paddingBottom: 4 },
-  headerTitle:{ fontSize: 12, color: TEXT_DIM, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase' },
-  headerSub:  { fontSize: 11, color: TEXT_DIM, opacity: 0.7, marginTop: 2, marginBottom: 6 },
-  divider:    { height: 1, backgroundColor: CARD_BORDER, marginHorizontal: 12 },
-  chartWrap:  { paddingHorizontal: 8, paddingBottom: 8 },
+  card: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    backgroundColor: CARD_BG,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    overflow: 'visible',
+    shadowColor: '#166534',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  header:     { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4 },
+  headerRow:  { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  headerTitle:{ fontSize: 20, fontWeight: '700', color: TEXT_DARK },
+  headerSub:  { fontSize: 13, color: TEXT_DIM, marginTop: 2 },
+  detailBtn:  { flexDirection: 'row', alignItems: 'center', gap: 2, paddingTop: 4 },
+  detailBtnTxt: { fontSize: 13, fontWeight: '600', color: '#22c55e' },
+  tabsWrap:   { paddingHorizontal: 12, paddingBottom: 4 },
+  hero: {
+    alignItems: 'center',
+    paddingTop: 4,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+  },
+  heroVal: { fontSize: 52, fontWeight: '300', letterSpacing: -1, lineHeight: 58 },
+  heroLbl: { fontSize: 15, color: TEXT_MED, marginTop: 4 },
+  heroRange: { fontSize: 14, color: TEXT_DIM, marginTop: 8 },
+  chartCard: {
+    marginHorizontal: 8,
+    marginBottom: 12,
+    paddingVertical: 4,
+    alignItems: 'center',
+    overflow: 'visible',
+  },
 });
 
 /* ── Daily List (lịch sử 7 ngày) ────────────────────────────────────────── */
@@ -550,8 +625,8 @@ const dl = StyleSheet.create({
 
 function WaterCard({ sensorData, maxWaterDist, tankFullDist }) {
   const wDist = sensorData?.waterLevel ?? null;
-  const maxD  = maxWaterDist ?? DEFAULT_MAX_WATER_DIST;
-  const fullD = tankFullDist ?? DEFAULT_TANK_FULL_DIST;
+  const maxD  = maxWaterDist;
+  const fullD = tankFullDist;
   const pct   = waterDistanceToPercent(wDist, maxD, fullD);
   const status = wDist == null || pct == null ? null
     : pct >= 55 ? { label: '✓ Đủ nước',   color: '#4ade80' }
@@ -602,9 +677,7 @@ function DetailCards({ sensorData, dailyData, maxWaterDist, tankFullDist }) {
   const air   = sensorData?.airHum      ?? null;
   const light = sensorData?.light       ?? null;
   const wDist = sensorData?.waterLevel  ?? null;
-  const maxD  = maxWaterDist ?? DEFAULT_MAX_WATER_DIST;
-  const fullD = tankFullDist ?? DEFAULT_TANK_FULL_DIST;
-  const wPct  = waterDistanceToPercent(wDist, maxD, fullD);
+  const wPct  = waterDistanceToPercent(wDist, maxWaterDist, tankFullDist);
 
   const avg30 = useMemo(() => {
     if (!dailyData.length) return {};
@@ -836,8 +909,8 @@ function buildAlerts(sensorData, thresholds, maxWaterDist, tankFullDist) {
     minAirHum = 50,
     maxLux    = 20000,
   } = thresholds || {};
-  const maxWD = maxWaterDist ?? DEFAULT_MAX_WATER_DIST;
-  const fullD = tankFullDist ?? DEFAULT_TANK_FULL_DIST;
+  const maxWD = maxWaterDist;
+  const fullD = tankFullDist;
 
   const alerts = [];
 
@@ -991,11 +1064,10 @@ export default function DashboardScreen() {
   const { sensorData, history, setHistory } = useMqtt();
   const [refreshing,    setRefreshing]    = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [maxWaterDist,  setMaxWaterDist]  = useState(DEFAULT_MAX_WATER_DIST);
-  const [tankFullDist,  setTankFullDist]  = useState(DEFAULT_TANK_FULL_DIST);
+  const [maxWaterDist,  setMaxWaterDist]  = useState(null);
+  const [tankFullDist,  setTankFullDist]  = useState(null);
   const [waterTankCalibrated, setWaterTankCalibrated] = useState(false);
   const [todayEntries, setTodayEntries] = useState([]);
-  const [yesterdayEntries, setYesterdayEntries] = useState([]);
   const [dailyData,     setDailyData]     = useState([]);
   const [historyDetail, setHistoryDetail] = useState(null);
   const tankMigrateRef = useRef(false);
@@ -1058,14 +1130,8 @@ export default function DashboardScreen() {
   const loadChartData = useCallback(async () => {
     try {
       const todayKey = localDateKey(Date.now());
-      const yesterdayKey = offsetLocalDateKey(todayKey, -1);
-
-      const [today, yesterday] = await Promise.all([
-        loadEntriesForDate(todayKey),
-        loadEntriesForDate(yesterdayKey),
-      ]);
+      const today = await loadEntriesForDate(todayKey);
       setTodayEntries(today);
-      setYesterdayEntries(yesterday);
 
       // Daily: last 30 days
       const keys     = getDateKeys(30);
@@ -1130,8 +1196,11 @@ export default function DashboardScreen() {
           {/* Hourly strip */}
           <TodayTrendChart
             todayEntries={todayEntries}
-            yesterdayEntries={yesterdayEntries}
             sensorData={sensorData}
+            onOpenDetail={(payload) => {
+              const day = dailyData.find((d) => d.dateKey === payload.dateKey);
+              setHistoryDetail({ ...payload, dayStats: day });
+            }}
           />
 
           {/* Lịch sử 30 ngày qua */}

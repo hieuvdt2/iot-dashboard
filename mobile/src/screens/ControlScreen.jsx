@@ -161,14 +161,12 @@ const ms = StyleSheet.create({
 /* ── Quick Sensor Tiles ───────────────────────────────────────────────────── */
 function SensorTiles({ sensorData, maxWaterDist, tankFullDist }) {
   const wDist = sensorData?.waterLevel ?? null;
-  const maxD  = maxWaterDist ?? 20;
-  const fullD = tankFullDist ?? DEFAULT_TANK_FULL_DISTANCE;
-  const wPct  = waterDistanceToPercent(wDist, maxD, fullD);
+  const wPct  = waterDistanceToPercent(wDist, maxWaterDist, tankFullDist);
 
   const tiles = [
     { lib: 'mci', icon: 'thermometer',   label: 'Nhiệt độ', val: sensorData?.temperature, unit: '°C', color: '#f97316' },
     { lib: 'ion', icon: 'water-outline', label: 'Độ ẩm KK', val: sensorData?.airHum,      unit: '%',  color: '#3b82f6' },
-    { lib: 'mci', icon: 'water-pump',    label: 'Bể nước',  val: wPct,                    unit: '%',  color: '#06b6d4' },
+    { lib: 'mci', icon: 'water-pump',    label: 'Bể nước',  val: wPct ?? '—',             unit: wPct != null ? '%' : '', color: '#06b6d4' },
   ];
 
   const Icon = ({ lib, name, size, color }) =>
@@ -259,8 +257,8 @@ const sb = StyleSheet.create({
 export default function ControlScreen() {
   const { mqttStatus, pumpState, autoMode, sensorData, setPumpState, setAutoMode, publishControl } = useMqtt();
   const [sending, setSending] = useState(null);
-  const [maxWaterDist, setMaxWaterDist] = useState(20);
-  const [tankFullDist, setTankFullDist] = useState(DEFAULT_TANK_FULL_DISTANCE);
+  const [maxWaterDist, setMaxWaterDist] = useState(null);
+  const [tankFullDist, setTankFullDist] = useState(null);
 
   useEffect(() => {
     (async () => {

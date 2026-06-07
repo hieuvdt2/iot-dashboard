@@ -8,7 +8,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { firebaseService } from '../services/firebaseService';
 import { normalizeSensorPayload } from '../utils/normalizeSensor';
 import WeatherDayChart from './WeatherDayChart';
-import { DEFAULT_TANK_FULL_DISTANCE, waterDistanceToPercent } from '../utils/waterLevel';
+import { DEFAULT_TANK_FULL_DISTANCE, WATER_CALIBRATION_KEY, waterDistanceToPercent } from '../utils/waterLevel';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 const VN_WEEKDAY = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
 const VN_DAY_SHORT = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
@@ -112,7 +112,7 @@ function normRaw(raw) {
   return { ts: toMs(raw.ts || raw.timestamp), ...n };
 }
 
-const DEFAULT_MAX_WATER_DIST = 20;
+
 const DEFAULT_TANK_FULL_DIST = DEFAULT_TANK_FULL_DISTANCE;
 
 function toSensorDisplayValue(val, sensorKey, maxWaterDist, tankFullDist) {
@@ -123,7 +123,7 @@ function toSensorDisplayValue(val, sensorKey, maxWaterDist, tankFullDist) {
   return val;
 }
 
-function dayAvg(entries, sensorKey, maxWaterDist = DEFAULT_MAX_WATER_DIST, tankFullDist = DEFAULT_TANK_FULL_DIST) {
+function dayAvg(entries, sensorKey, maxWaterDist, tankFullDist) {
   const vals = entries
     .map((e) => toSensorDisplayValue(safeNum(e[sensorKey]), sensorKey, maxWaterDist, tankFullDist))
     .filter((v) => v != null);
@@ -131,7 +131,7 @@ function dayAvg(entries, sensorKey, maxWaterDist = DEFAULT_MAX_WATER_DIST, tankF
   return Math.round(vals.reduce((s, v) => s + v, 0) / vals.length * 10) / 10;
 }
 
-function dayMinMax(entries, sensorKey, maxWaterDist = DEFAULT_MAX_WATER_DIST, tankFullDist = DEFAULT_TANK_FULL_DIST) {
+function dayMinMax(entries, sensorKey, maxWaterDist, tankFullDist) {
   const vals = entries
     .map((e) => toSensorDisplayValue(safeNum(e[sensorKey]), sensorKey, maxWaterDist, tankFullDist))
     .filter((v) => v != null);
@@ -277,15 +277,17 @@ export default function HistoryDetailSheet({
   );
   const [loading, setLoading] = useState(true);
   const [multiDayData, setMultiDayData] = useState({});
-  const [maxWaterDist, setMaxWaterDist] = useState(DEFAULT_MAX_WATER_DIST);
-  const [tankFullDist, setTankFullDist] = useState(DEFAULT_TANK_FULL_DIST);
+  const [maxWaterDist, setMaxWaterDist] = useState(null);
+  const [tankFullDist, setTankFullDist] = useState(null);
 
   useEffect(() => {
     Promise.all([
+      AsyncStorage.getItem(WATER_CALIBRATION_KEY),
       AsyncStorage.getItem('iot_max_water_distance'),
       AsyncStorage.getItem('iot_tank_full_distance'),
     ])
-      .then(([emptyV, fullV]) => {
+      .then(([calibV, emptyV, fullV]) => {
+        if (calibV !== 'true') return;
         if (emptyV) setMaxWaterDist(Number(emptyV));
         if (fullV) setTankFullDist(Number(fullV));
       })
@@ -406,6 +408,7 @@ export default function HistoryDetailSheet({
           </View>
 
           <Text style={s.sectionTitle}>Diễn biến theo giờ</Text>
+          <Text style={s.sectionHint}>Cả ngày 0h–23h · So sánh hôm qua (nét đứt)</Text>
           <View style={s.chartCard}>
             {!hasChart && !loading ? (
               <Text style={s.empty}>Chưa đủ dữ liệu để vẽ biểu đồ.</Text>
@@ -422,6 +425,7 @@ export default function HistoryDetailSheet({
                 selectedLabel={selectedLabel}
                 compareLabel={dayShortLabel(yesterdayKey)}
                 showHero={false}
+                hourWindow="full24"
               />
             )}
           </View>
@@ -636,7 +640,13 @@ const s = StyleSheet.create({
 
   sectionTitle: {
     fontSize: 20, fontWeight: '700', color: '#1a3028',
-    marginHorizontal: 20, marginBottom: 10, marginTop: 8,
+    marginHorizontal: 20, marginBottom: 4, marginTop: 8,
+  },
+  sectionHint: {
+    fontSize: 13,
+    color: '#8ab49a',
+    marginHorizontal: 20,
+    marginBottom: 10,
   },
   card: {
     marginHorizontal: 16, backgroundColor: '#fff', borderRadius: 16,
@@ -647,12 +657,13 @@ const s = StyleSheet.create({
     marginHorizontal: 16,
     backgroundColor: '#fff',
     borderRadius: 16,
-    paddingVertical: 8,
+    paddingVertical: 12,
     paddingHorizontal: 8,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#e2ece5',
     alignItems: 'center',
+    overflow: 'visible',
   },
   summaryCard: {
     marginHorizontal: 16, backgroundColor: '#fff', borderRadius: 18,

@@ -31,8 +31,6 @@ const DEFAULT_CONFIG = {
   maxLux:  20000,
 };
 
-const DEFAULT_MAX_WATER_DISTANCE = 20;
-
 const FIELDS = [
   { key: 'minSoil',    label: 'Độ ẩm đất tối thiểu', unit: '%' },
   { key: 'targetSoil', label: 'Độ ẩm đất mục tiêu',  unit: '%' },
@@ -248,12 +246,12 @@ export default function ConfigScreen() {
   const [tab, setTab]                 = useState('custom');     // 'custom' | 'preset'
   const [deployed, setDeployed]       = useState(DEFAULT_CONFIG);
   const [draft, setDraft]             = useState(DEFAULT_CONFIG);
-  const [maxWaterDist, setMaxWaterDist] = useState(DEFAULT_MAX_WATER_DISTANCE);
-  const [tankFullDist, setTankFullDist] = useState(DEFAULT_TANK_FULL_DISTANCE);
+  const [maxWaterDist, setMaxWaterDist] = useState(null);
+  const [tankFullDist, setTankFullDist] = useState(null);
   const [waterTankCalibrated, setWaterTankCalibrated] = useState(false);
   const [tankUnit, setTankUnit] = useState('cm');
-  const [draftEmptyCm, setDraftEmptyCm] = useState(DEFAULT_MAX_WATER_DISTANCE);
-  const [draftFullCm, setDraftFullCm] = useState(DEFAULT_TANK_FULL_DISTANCE);
+  const [draftEmptyCm, setDraftEmptyCm] = useState(null);
+  const [draftFullCm, setDraftFullCm] = useState(null);
   const [emptyText, setEmptyText] = useState('');
   const [fullText, setFullText] = useState('');
   const [savingTank, setSavingTank] = useState(false);
@@ -397,15 +395,21 @@ export default function ConfigScreen() {
         ]);
         const unit = loadTankDistanceUnit(AsyncStorage);
         setTankUnit(unit);
-        const emptyCm = emptyV ? Number(emptyV) : DEFAULT_MAX_WATER_DISTANCE;
-        const fullCm = fullV ? Number(fullV) : DEFAULT_TANK_FULL_DISTANCE;
-        setMaxWaterDist(emptyCm);
-        setTankFullDist(fullCm);
-        setDraftEmptyCm(emptyCm);
-        setDraftFullCm(fullCm);
-        setEmptyText(formatCmForInput(emptyCm, unit));
-        setFullText(formatCmForInput(fullCm, unit));
-        if (calibV === 'true') setWaterTankCalibrated(true);
+        if (calibV === 'true') {
+          setWaterTankCalibrated(true);
+          const emptyCm = emptyV != null && emptyV !== '' ? Number(emptyV) : null;
+          const fullCm = fullV != null && fullV !== '' ? Number(fullV) : null;
+          if (emptyCm != null && emptyCm > 0) {
+            setMaxWaterDist(emptyCm);
+            setDraftEmptyCm(emptyCm);
+            setEmptyText(formatCmForInput(emptyCm, unit));
+          }
+          if (fullCm != null && fullCm >= 0) {
+            setTankFullDist(fullCm);
+            setDraftFullCm(fullCm);
+            setFullText(formatCmForInput(fullCm, unit));
+          }
+        }
       } catch {}
     })();
   }, []);
@@ -549,7 +553,7 @@ export default function ConfigScreen() {
             : waterTankCalibrated && <View style={[cs.pill, cs.pillGreen]}><Text style={cs.pillGreenText}>Đã lưu ✓</Text></View>}
         </View>
         <Text style={cs.cardSub}>
-          Nhập chiều cao bể để tính % mực nước — cảm biến HC-SR04 gắn trên đỉnh bể.
+          Hai mốc 0% và 100% để quy đổi muc_nuoc sang % — tùy bể nhỏ hay bể cao.
         </Text>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
@@ -565,9 +569,9 @@ export default function ConfigScreen() {
           ))}
         </View>
 
-        <Text style={{ fontSize: 13, fontWeight: '600', color: C.text, marginBottom: 4 }}>Chiều cao bể ({tankUnit})</Text>
+        <Text style={{ fontSize: 13, fontWeight: '600', color: C.text, marginBottom: 4 }}>Mức cạn (0%) — chiều cao bể ({tankUnit})</Text>
         <Text style={{ fontSize: 12, color: C.text2, marginBottom: 8, lineHeight: 18 }}>
-          Đo bằng thước từ đáy lên cảm biến. Dùng làm mốc 0% khi bể cạn.
+          Số muc_nuoc khi hết nước. Bể 10 m thì nhập 10 {tankUnit}.
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
           <TextInput
@@ -585,9 +589,10 @@ export default function ConfigScreen() {
           <Text style={{ fontSize: 13, color: C.text2 }}>{tankUnit}</Text>
         </View>
 
-        <Text style={{ fontSize: 13, fontWeight: '600', color: C.text, marginBottom: 4 }}>Khoảng cách khi đầy (100%)</Text>
+        <Text style={{ fontSize: 13, fontWeight: '600', color: C.text, marginBottom: 4 }}>Mức đủ nước (100%)</Text>
         <Text style={{ fontSize: 12, color: C.text2, marginBottom: 8, lineHeight: 18 }}>
-          Giá trị muc_nuoc khi nước sát cảm biến — thường {tankUnit === 'm' ? '0.02–0.03 m' : '2–3 cm'}.
+          Số muc_nuoc khi coi bể đã đủ (không nhất thiết đổ tới miệng). Bể nhỏ: {tankUnit === 'm' ? '0,02–0,03 m' : '2–3 cm'}.
+          Bể cao (đổ tới 7 m/10 m): nhập khoảng cách lúc đủ nước (vd. 3 {tankUnit}).
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           <TextInput
@@ -621,20 +626,20 @@ export default function ConfigScreen() {
               style={[cs.btnGhost, { flex: 1, minWidth: 140 }]}
               onPress={() => applyTankFromSensor(Number(sensorData.waterLevel), 'empty')}
             >
-              <Text style={cs.btnGhostText}>Ghi {formatDistanceLabel(sensorData.waterLevel, tankUnit)} → cạn</Text>
+              <Text style={cs.btnGhostText}>Ghi {formatDistanceLabel(sensorData.waterLevel, tankUnit)} → cạn (0%)</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[cs.btnGhost, { flex: 1, minWidth: 140 }]}
               onPress={() => applyTankFromSensor(Number(sensorData.waterLevel), 'full')}
             >
-              <Text style={cs.btnGhostText}>Ghi {formatDistanceLabel(sensorData.waterLevel, tankUnit)} → đầy</Text>
+              <Text style={cs.btnGhostText}>Ghi {formatDistanceLabel(sensorData.waterLevel, tankUnit)} → đủ (100%)</Text>
             </TouchableOpacity>
           </View>
         )}
         <View style={{ backgroundColor: C.blueLight, borderRadius: 8, borderWidth: 1, borderColor: '#bfdbfe', padding: 12 }}>
           <Text style={{ fontSize: 13, color: '#1e40af', lineHeight: 20 }}>
             <Text style={{ fontWeight: '700' }}>Cách tính %:</Text>
-            {'\n'}% = (chiều cao bể − muc_nuoc) / (chiều cao bể − mức đầy) × 100
+            {'\n'}% = (mức cạn − muc_nuoc) / (mức cạn − mức đủ nước) × 100
             {sensorData?.waterLevel != null && (
               <>
                 {'\n\n'}Đọc hiện tại: {formatDistanceLabel(sensorData.waterLevel, tankUnit)}

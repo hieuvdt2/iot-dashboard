@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { firebaseService } from '../services/firebaseService';
 import {
   aggregateHourly,
@@ -6,42 +6,132 @@ import {
   normalizeEntry,
 } from '../utils/sensorHistory';
 
-const HOUR_LABELS = [0, 3, 6, 9, 12, 15, 18, 21].map(
-  (h) => `${String(h).padStart(2, '0')}:00`,
-);
+const CHART_FIELDS = ['nhiet_do', 'do_am_khong_khi', 'do_am_dat', 'anh_sang', 'muc_nuoc'];
 
 function safeNum(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
 
-/** Chuẩn hóa 8 mốc giờ cho biểu đồ (00–21) */
-export function fillChartHours(aggregated) {
+/** Đọc giá trị realtime từ MQTT / Firebase latest */
+export function extractLiveEntry(sensorData) {
+  if (!sensorData) return null;
+  const entry = normalizeEntry({
+    ts: sensorData.ts ?? sensorData.timestamp ?? Date.now(),
+    nhiet_do: sensorData.nhiet_do,
+    do_am_khong_khi: sensorData.do_am_khong_khi,
+    do_am_dat: sensorData.do_am_dat,
+    anh_sang: sensorData.anh_sang,
+    muc_nuoc: sensorData.muc_nuoc,
+  });
+  const hasAny = CHART_FIELDS.some((k) => entry[k] != null);
+  return hasAny ? entry : null;
+}
+
+function hourBucketHasData(row) {
+  return Boolean(row && CHART_FIELDS.some((f) => safeNum(row[f]) != null));
+}
+
+/**
+ * Chỉ điền bucket giờ hiện tại khi Firebase chưa có dữ liệu giờ đó.
+ * Mỗi giờ snapshot live một lần — biểu đồ không nhảy theo từng tick cảm biến.
+ */
+export function mergeLiveIntoHourly(hourlyRaw, live, liveSeedRef, chartHour = new Date().getHours()) {
+  if (!live) return hourlyRaw;
+  const h = chartHour;
+  const existing = hourlyRaw.find((r) => parseInt(String(r.time).split(':')[0], 10) === h);
+  if (hourBucketHasData(existing)) return hourlyRaw;
+
+  let snapshot = live;
+  if (liveSeedRef) {
+    if (liveSeedRef.current?.hour === h) {
+      snapshot = liveSeedRef.current.entry;
+    } else {
+      liveSeedRef.current = { hour: h, entry: live };
+      snapshot = live;
+    }
+  }
+
+  const label = `${String(h).padStart(2, '0')}:00`;
+  const rows = hourlyRaw.map((r) => ({ ...r }));
+  let idx = rows.findIndex((r) => parseInt(String(r.time).split(':')[0], 10) === h);
+  if (idx < 0) {
+    rows.push({
+      time: label,
+      nhiet_do: null,
+      do_am_khong_khi: null,
+      do_am_dat: null,
+      anh_sang: null,
+      muc_nuoc: null,
+    });
+    rows.sort((a, b) => parseInt(String(a.time), 10) - parseInt(String(b.time), 10));
+    idx = rows.findIndex((r) => parseInt(String(r.time).split(':')[0], 10) === h);
+  }
+  const row = { ...rows[idx] };
+  CHART_FIELDS.forEach((f) => {
+    if (snapshot[f] != null) row[f] = Number(snapshot[f]);
+  });
+  row.fromLive = true;
+  rows[idx] = row;
+  return rows;
+}
+
+/** Cập nhật khi sang giờ mới (biểu đồ theo giờ, không theo tick cảm biến) */
+export function useCurrentChartHour() {
+  const [hour, setHour] = useState(() => new Date().getHours());
+  useEffect(() => {
+    const tick = () => {
+      const h = new Date().getHours();
+      setHour((prev) => (prev !== h ? h : prev));
+    };
+    tick();
+    const id = setInterval(tick, 30_000);
+    return () => clearInterval(id);
+  }, []);
+  return hour;
+}
+
+/** Các mốc 0h → giờ hiện tại; ô không có dữ liệu = null (không hard-code 0) */
+export function fillChartHoursToday(aggregated) {
   const byHour = new Map();
   aggregated.forEach((row) => {
     const h = parseInt(String(row.time).split(':')[0], 10);
     if (!Number.isNaN(h)) byHour.set(h, row);
   });
 
-  return HOUR_LABELS.map((label) => {
-    const h = parseInt(label.split(':')[0], 10);
-    const src = byHour.get(h) ?? {};
+  const nowH = new Date().getHours();
+  const hours = [];
+  for (let h = 0; h <= nowH; h += 1) hours.push(h);
+
+  return hours.map((h) => {
+    const label = `${String(h).padStart(2, '0')}:00`;
+    const src = byHour.get(h);
     return {
       time: label,
-      nhiet_do: safeNum(src.nhiet_do),
-      do_am_dat: safeNum(src.do_am_dat),
-      do_am_khong_khi: safeNum(src.do_am_khong_khi),
-      anh_sang: safeNum(src.anh_sang),
-      muc_nuoc: safeNum(src.muc_nuoc),
+      nhiet_do: safeNum(src?.nhiet_do),
+      do_am_khong_khi: safeNum(src?.do_am_khong_khi),
+      do_am_dat: safeNum(src?.do_am_dat),
+      anh_sang: safeNum(src?.anh_sang),
+      muc_nuoc: safeNum(src?.muc_nuoc),
+      fromLive: Boolean(src?.fromLive),
     };
   });
 }
 
-export function useGardenChartData(refreshKey = 0) {
+/** @deprecated Dùng fillChartHoursToday */
+export function fillChartHours(aggregated) {
+  return fillChartHoursToday(aggregated);
+}
+
+export function useGardenChartData(sensorData = null) {
   const [hourlyRaw, setHourlyRaw] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastSync, setLastSync] = useState(null);
+  const liveSeedRef = useRef(null);
+  const sensorRef = useRef(sensorData);
+  sensorRef.current = sensorData;
+  const chartHour = useCurrentChartHour();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -61,11 +151,15 @@ export function useGardenChartData(refreshKey = 0) {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData, refreshKey]);
+  }, [fetchData]);
 
-  const chartData = fillChartHours(hourlyRaw);
+  const hourlyMerged = useMemo(() => {
+    const liveEntry = extractLiveEntry(sensorRef.current);
+    return mergeLiveIntoHourly(hourlyRaw, liveEntry, liveSeedRef, chartHour);
+  }, [hourlyRaw, chartHour]);
+  const chartData = useMemo(() => fillChartHoursToday(hourlyMerged), [hourlyMerged]);
 
-  return { chartData, hourlyRaw, loading, error, lastSync, refetch: fetchData };
+  return { chartData, hourlyRaw: hourlyMerged, loading, error, lastSync, refetch: fetchData };
 }
 
 export function getHourTrend(hourlyRaw, key, currentValue) {
