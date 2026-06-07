@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet,
   SafeAreaView, ScrollView, ActivityIndicator, StatusBar,
@@ -7,8 +7,8 @@ import {
 import Svg, { Path, Text as SvgText, Circle } from 'react-native-svg';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useMqtt } from '../MqttContext';
-import { firebaseService } from '../services/firebaseService';
-import { DEFAULT_TANK_FULL_DISTANCE, splitDeviceConfig, waterDistanceToPercent } from '../utils/waterLevel';
+import { waterDistanceToPercent } from '../utils/waterLevel';
+import { useTankCalibration } from '../hooks/useTankCalibration';
 
 const BG     = '#f5f8f5';
 const WHITE  = '#ffffff';
@@ -146,7 +146,7 @@ function SystemStatus({ autoMode, pumpOn }) {
           color={pumpOn ? GREEN2 : LIGHT}
         />
         <Text style={[ms.chipTxt, { color: pumpOn ? GREEN2 : LIGHT }]}>
-          Bơm {pumpOn ? 'đang bật' : 'đang tắt'}
+          {pumpOn ? 'Đang tưới' : 'Không tưới'}
         </Text>
       </View>
     </View>
@@ -257,30 +257,7 @@ const sb = StyleSheet.create({
 export default function ControlScreen() {
   const { mqttStatus, pumpState, autoMode, sensorData, setPumpState, setAutoMode, publishControl } = useMqtt();
   const [sending, setSending] = useState(null);
-  const [maxWaterDist, setMaxWaterDist] = useState(null);
-  const [tankFullDist, setTankFullDist] = useState(null);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-        const [emptyV, fullV] = await Promise.all([
-          AsyncStorage.getItem('iot_max_water_distance'),
-          AsyncStorage.getItem('iot_tank_full_distance'),
-        ]);
-        if (emptyV) setMaxWaterDist(Number(emptyV));
-        if (fullV) setTankFullDist(Number(fullV));
-      } catch {}
-    })();
-
-    const unsub = firebaseService.subscribeConfig((cfg) => {
-      const { tankEmpty, tankFull, tankCalibrated } = splitDeviceConfig(cfg);
-      if (!tankCalibrated) return;
-      if (tankEmpty != null && tankEmpty > 0) setMaxWaterDist(tankEmpty);
-      if (tankFull != null && tankFull >= 0) setTankFullDist(tankFull);
-    });
-    return unsub;
-  }, []);
+  const { maxWaterDist, tankFullDist } = useTankCalibration();
 
   const send = useCallback((cmd) => {
     if (sending) return;

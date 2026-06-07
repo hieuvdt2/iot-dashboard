@@ -8,8 +8,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { firebaseService } from '../services/firebaseService';
 import { normalizeSensorPayload } from '../utils/normalizeSensor';
 import WeatherDayChart from './WeatherDayChart';
-import { DEFAULT_TANK_FULL_DISTANCE, WATER_CALIBRATION_KEY, waterDistanceToPercent } from '../utils/waterLevel';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DEFAULT_TANK_FULL_DISTANCE, waterDistanceToPercent } from '../utils/waterLevel';
+import { useTankCalibration } from '../hooks/useTankCalibration';
 const VN_WEEKDAY = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
 const VN_DAY_SHORT = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 const OVERLAY_DAYS = 1;
@@ -277,22 +277,7 @@ export default function HistoryDetailSheet({
   );
   const [loading, setLoading] = useState(true);
   const [multiDayData, setMultiDayData] = useState({});
-  const [maxWaterDist, setMaxWaterDist] = useState(null);
-  const [tankFullDist, setTankFullDist] = useState(null);
-
-  useEffect(() => {
-    Promise.all([
-      AsyncStorage.getItem(WATER_CALIBRATION_KEY),
-      AsyncStorage.getItem('iot_max_water_distance'),
-      AsyncStorage.getItem('iot_tank_full_distance'),
-    ])
-      .then(([calibV, emptyV, fullV]) => {
-        if (calibV !== 'true') return;
-        if (emptyV) setMaxWaterDist(Number(emptyV));
-        if (fullV) setTankFullDist(Number(fullV));
-      })
-      .catch(() => {});
-  }, []);
+  const { maxWaterDist, tankFullDist } = useTankCalibration();
 
   const effectiveDateKey = useMemo(
     () => (parseDateKey(selectedDateKey) ? selectedDateKey : todayKey()),
