@@ -20,6 +20,17 @@ import {
 import {
   buildEnvironmentAlerts,
 } from './shared/utils/environmentAlerts';
+import {
+  DEFAULT_TANK_FULL_DISTANCE,
+  buildFirebaseConfigPayload,
+  buildMqttConfigPayload,
+  getWaterLevelStatus,
+  isWaterTankCalibrated,
+  markWaterTankCalibrated,
+  pickPlantThresholds,
+  splitDeviceConfig,
+  waterDistanceToPercent,
+} from './shared/utils/waterLevel';
 
 const DEFAULT_CONFIG = {
   minSoil: 35,
@@ -43,7 +54,8 @@ const THRESHOLD_KEYS = [
 const loadStoredThresholds = () => {
   try {
     const saved = localStorage.getItem('iot_thresholds');
-    return saved ? JSON.parse(saved) : { ...DEFAULT_CONFIG };
+    const parsed = saved ? JSON.parse(saved) : { ...DEFAULT_CONFIG };
+    return pickPlantThresholds(parsed);
   } catch (e) {
     return { ...DEFAULT_CONFIG };
   }
@@ -178,6 +190,7 @@ function App() {
   const navCollapsed = sidebarCollapsed && !isMobile;
   const [theme, setTheme] = useState(loadThemePref);
   const userMenuRef = useRef(null);
+  const tankMigrateRef = useRef(false);
   const [users, setUsers] = useState({});
   const [roles, setRoles] = useState({});
   const [adminDbError, setAdminDbError] = useState(null);
@@ -196,10 +209,60 @@ function App() {
       return v ? Number(v) : DEFAULT_MAX_WATER_DISTANCE;
     } catch { return DEFAULT_MAX_WATER_DISTANCE; }
   });
+  const [tankFullDistance, setTankFullDistance] = useState(() => {
+    try {
+      const v = localStorage.getItem('iot_tank_full_distance');
+      return v ? Number(v) : DEFAULT_TANK_FULL_DISTANCE;
+    } catch { return DEFAULT_TANK_FULL_DISTANCE; }
+  });
+  const [waterTankCalibrated, setWaterTankCalibrated] = useState(isWaterTankCalibrated);
+
+  const handleMarkWaterCalibrated = useCallback(() => {
+    markWaterTankCalibrated();
+    setWaterTankCalibrated(true);
+  }, []);
 
   const presets = useMemo(() => [...BASE_PRESETS, ...customPresets], [customPresets]);
   const canEdit = role === 'admin';
   const canControl = role === 'admin';
+
+  const publishTankToDevice = useCallback((emptyDist, fullDist) => {
+    if (!canEdit) return;
+    const mqttPayload = buildMqttConfigPayload(deployedThresholds, emptyDist, fullDist);
+    const fbPayload = buildFirebaseConfigPayload(deployedThresholds, emptyDist, fullDist, true);
+    mqttService.publishConfig(mqttPayload);
+    firebaseService.saveConfig(fbPayload);
+  }, [canEdit, deployedThresholds]);
+
+  const saveTankConfig = useCallback((emptyDist, fullDist) => {
+    if (!canEdit) return;
+    setMaxWaterDistance(emptyDist);
+    setTankFullDistance(fullDist);
+    handleMarkWaterCalibrated();
+    try {
+      localStorage.setItem('iot_max_water_distance', String(emptyDist));
+      localStorage.setItem('iot_tank_full_distance', String(fullDist));
+    } catch {
+      // ignore
+    }
+    publishTankToDevice(emptyDist, fullDist);
+    setToast({ type: 'success', message: 'Đã lưu cấu hình bể nước.' });
+  }, [canEdit, handleMarkWaterCalibrated, publishTankToDevice]);
+
+  const applyTankCalibration = useCallback((tankEmpty, tankFull) => {
+    if (tankEmpty != null && Number.isFinite(tankEmpty) && tankEmpty > 0) {
+      setMaxWaterDistance(tankEmpty);
+      try { localStorage.setItem('iot_max_water_distance', String(tankEmpty)); } catch {}
+    }
+    if (tankFull != null && Number.isFinite(tankFull) && tankFull >= 0) {
+      setTankFullDistance(tankFull);
+      try { localStorage.setItem('iot_tank_full_distance', String(tankFull)); } catch {}
+    }
+    if (tankEmpty != null || tankFull != null) {
+      markWaterTankCalibrated();
+      setWaterTankCalibrated(true);
+    }
+  }, []);
 
   useEffect(() => {
     const envSnapshot = {
@@ -310,24 +373,43 @@ function App() {
 
   useEffect(() => {
     const unsubscribeConfig = firebaseService.subscribeConfig((config) => {
-      const cleaned = { ...config };
-      delete cleaned.updatedAt;
+      const { thresholds, tankEmpty, tankFull, tankCalibrated } = splitDeviceConfig(config);
+
+      if (tankCalibrated) {
+        applyTankCalibration(tankEmpty, tankFull);
+      } else if (isWaterTankCalibrated() && !tankMigrateRef.current) {
+        tankMigrateRef.current = true;
+        let empty;
+        let full;
+        try {
+          empty = Number(localStorage.getItem('iot_max_water_distance'));
+          full = Number(localStorage.getItem('iot_tank_full_distance')) || DEFAULT_TANK_FULL_DISTANCE;
+        } catch {
+          empty = 0;
+        }
+        if (empty > 0) {
+          firebaseService.saveConfig(
+            buildFirebaseConfigPayload(thresholds, empty, full, true),
+          );
+        }
+      }
+
       setDeployedThresholds((prevDeployed) => {
         setDraftThresholds((prevDraft) => (
-          thresholdsEqual(prevDraft, prevDeployed) ? cleaned : prevDraft
+          thresholdsEqual(prevDraft, prevDeployed) ? thresholds : prevDraft
         ));
-        return cleaned;
+        return thresholds;
       });
       setConfigReady(true);
       try {
-        localStorage.setItem('iot_thresholds', JSON.stringify(cleaned));
+        localStorage.setItem('iot_thresholds', JSON.stringify(thresholds));
       } catch (e) {
         // Ignore storage errors.
       }
     });
 
     return () => unsubscribeConfig();
-  }, []);
+  }, [applyTankCalibration]);
 
   useEffect(() => {
     let roleUnsubscribe = null;
@@ -471,8 +553,15 @@ function App() {
     }
     setDeployedThresholds({ ...draftThresholds });
     localStorage.setItem('iot_thresholds', JSON.stringify(draftThresholds));
-    firebaseService.saveConfig(draftThresholds);
-    mqttService.publishConfig(draftThresholds);
+    const mqttPayload = buildMqttConfigPayload(draftThresholds, maxWaterDistance, tankFullDistance);
+    const fbPayload = buildFirebaseConfigPayload(
+      draftThresholds,
+      maxWaterDistance,
+      tankFullDistance,
+      waterTankCalibrated,
+    );
+    firebaseService.saveConfig(fbPayload);
+    mqttService.publishConfig(mqttPayload);
     setConfigReady(true);
     const presetName = presets.find((item) => item.key === selectedPreset)?.name;
     setToast({
@@ -678,14 +767,9 @@ function App() {
   const autoModeLabel = autoModeLabelMap[autoMode] || autoMode || '---';
   const pumpOn = pumpStatus === 'DANG_TUOI';
   const waterDistance = sensorData?.muc_nuoc ?? null;
-  const waterPct = waterDistance !== null
-    ? Math.min(100, Math.max(0, 100 - Math.round((waterDistance / (maxWaterDistance ?? 25)) * 100)))
-    : 0;
-  // Trạng thái bể: small distance = full tank (sensor ở đỉnh, đo xuống mặt nước)
-  const waterStatus = waterDistance === null ? null
-    : waterDistance <= maxWaterDistance * 0.5 ? 'full'   // Đủ nước
-    : waterDistance <= maxWaterDistance       ? 'low'    // Thấp
-    : 'empty';                                           // Cạn — khoá bơm
+  const waterPct = waterDistanceToPercent(waterDistance, maxWaterDistance, tankFullDistance) ?? 0;
+  const waterLevelStatus = getWaterLevelStatus(waterDistance, maxWaterDistance, tankFullDistance);
+  const waterStatus = waterDistance === null ? null : (waterLevelStatus?.key ?? null);
   const waterStatusLabel = { full: 'Đủ nước', low: 'Nước thấp', empty: 'Cạn', null: '--' }[waterStatus];
   const waterStatusIcon = { full: 'check-circle', low: 'alert-triangle', empty: 'x-circle', null: null }[waterStatus];
   const waterStatusColor = { full: '#16a34a', low: '#d97706', empty: '#dc2626', null: '#9ca3af' }[waterStatus];
@@ -1022,6 +1106,7 @@ function App() {
                         history={history}
                         thresholds={deployedThresholds}
                         maxWaterDistance={maxWaterDistance}
+                        tankFullDistance={tankFullDistance}
                       />
                     ) : (
                       <ConfigPage
@@ -1033,10 +1118,10 @@ function App() {
                         hasUnsavedDraft={hasUnsavedDraft}
                         sensorData={sensorData}
                         maxWaterDistance={maxWaterDistance}
-                        onMaxWaterDistanceChange={(val) => {
-                          setMaxWaterDistance(val);
-                          try { localStorage.setItem('iot_max_water_distance', String(val)); } catch {}
-                        }}
+                        tankFullDistance={tankFullDistance}
+                        onSaveTankConfig={saveTankConfig}
+                        onMarkWaterCalibrated={handleMarkWaterCalibrated}
+                        waterTankCalibrated={waterTankCalibrated}
                         onSelectPreset={selectPreset}
                         onApplyDraft={applyDraftThresholds}
                         onDiscardDraft={discardDraft}

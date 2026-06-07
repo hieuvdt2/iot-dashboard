@@ -13,6 +13,7 @@ import {
   ResponsiveContainer,
   ReferenceArea,
 } from 'recharts';
+import { waterDistanceToPercent } from '../../utils/waterLevel';
 
 const COLORS = {
   primary: '#38bdf8',
@@ -75,7 +76,7 @@ function hasAnyData(data, keys) {
   return data.some((row) => keys.some((k) => row[k] != null));
 }
 
-export default function GardenCharts({ chartData, loading, maxWaterDistance = 20 }) {
+export default function GardenCharts({ chartData, loading, maxWaterDistance = 20, tankFullDistance = 2 }) {
   const tempStats = useMemo(() => seriesMinMax(chartData, 'nhiet_do'), [chartData]);
   const soilStats = useMemo(() => seriesMinMax(chartData, 'do_am_dat'), [chartData]);
   const waterStats = useMemo(() => seriesMinMax(chartData, 'muc_nuoc'), [chartData]);
@@ -86,7 +87,23 @@ export default function GardenCharts({ chartData, loading, maxWaterDistance = 20
   const lightEmpty = !hasAnyData(chartData, ['anh_sang']);
   const waterEmpty = !hasAnyData(chartData, ['muc_nuoc']);
 
-  const waterLow = maxWaterDistance * 0.75;
+  const waterChartData = useMemo(
+    () => chartData.map((row) => ({
+      ...row,
+      muc_nuoc_pct: row.muc_nuoc != null
+        ? waterDistanceToPercent(row.muc_nuoc, maxWaterDistance, tankFullDistance)
+        : null,
+    })),
+    [chartData, maxWaterDistance, tankFullDistance],
+  );
+
+  const waterPctStats = useMemo(() => {
+    if (waterStats.min == null || waterStats.max == null) return { min: null, max: null };
+    return {
+      min: waterDistanceToPercent(waterStats.max, maxWaterDistance, tankFullDistance),
+      max: waterDistanceToPercent(waterStats.min, maxWaterDistance, tankFullDistance),
+    };
+  }, [waterStats, maxWaterDistance, tankFullDistance]);
 
   return (
     <div className="gd-charts">
@@ -239,12 +256,12 @@ export default function GardenCharts({ chartData, loading, maxWaterDistance = 20
       <div className="gd-chart-card wide">
         <div className="gd-chart-head">
           <div>
-            <h3 className="gd-chart-title">Mực nước bồn chứa</h3>
-            <p className="gd-chart-sub">Cảnh báo khi gần cạn</p>
+            <h3 className="gd-chart-title">Mực nước bể (%)</h3>
+            <p className="gd-chart-sub">Quy đổi từ muc_nuoc Arduino theo hiệu chuẩn bể</p>
           </div>
           <div className="gd-chart-stats">
-            <span>Thấp nhất: <strong>{waterStats.max ?? '—'} cm</strong></span>
-            <span>Ngưỡng cảnh báo: <strong>{waterLow.toFixed(1)} cm</strong></span>
+            <span>Thấp nhất: <strong>{waterPctStats.min ?? '—'}%</strong></span>
+            <span>Cảnh báo dưới: <strong>25%</strong></span>
           </div>
         </div>
         <div className="gd-chart-body">
@@ -254,15 +271,15 @@ export default function GardenCharts({ chartData, loading, maxWaterDistance = 20
             <div className="gd-chart-empty">Chưa có dữ liệu hôm nay</div>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={chartData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                <ReferenceArea y1={waterLow} y2={maxWaterDistance * 1.2} fill="#ef4444" fillOpacity={0.06} />
+              <LineChart data={waterChartData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                <ReferenceArea y1={0} y2={25} fill="#ef4444" fillOpacity={0.08} />
                 <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} vertical={false} />
                 <XAxis dataKey="time" tick={{ fill: COLORS.text, fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: COLORS.text, fontSize: 11 }} axisLine={false} tickLine={false} unit="cm" />
-                <Tooltip content={<ChartTooltip unit=" cm" />} />
+                <YAxis domain={[0, 100]} tick={{ fill: COLORS.text, fontSize: 11 }} axisLine={false} tickLine={false} unit="%" />
+                <Tooltip content={<ChartTooltip unit="%" />} />
                 <Line
                   type="monotone"
-                  dataKey="muc_nuoc"
+                  dataKey="muc_nuoc_pct"
                   stroke={COLORS.water}
                   strokeWidth={2.5}
                   connectNulls

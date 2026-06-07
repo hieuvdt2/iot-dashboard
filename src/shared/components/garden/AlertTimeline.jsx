@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { waterDistanceToPercent } from '../../utils/waterLevel';
 
 function extractTime(timeStr) {
   if (!timeStr) return '—';
@@ -8,7 +9,7 @@ function extractTime(timeStr) {
   return timeStr;
 }
 
-function buildFromHistory(history, thresholds, maxWaterDistance) {
+function buildFromHistory(history, thresholds, maxWaterDistance, tankFullDistance = 2) {
   const events = [];
   const { minSoil = 35, maxTemp = 35, minAirHum = 50 } = thresholds;
 
@@ -45,13 +46,16 @@ function buildFromHistory(history, thresholds, maxWaterDistance) {
         detail: `${row.do_am_khong_khi}%`,
       });
     }
-    if (row.muc_nuoc != null && row.muc_nuoc > maxWaterDistance * 0.75) {
-      events.push({
-        id: `water-${row.time}`,
-        time,
-        message: 'Mực nước thấp',
-        detail: `${row.muc_nuoc} cm`,
-      });
+    if (row.muc_nuoc != null) {
+      const pct = waterDistanceToPercent(row.muc_nuoc, maxWaterDistance, tankFullDistance);
+      if (pct != null && pct <= 30) {
+        events.push({
+          id: `water-${row.time}`,
+          time,
+          message: 'Mực nước thấp',
+          detail: `${pct}%`,
+        });
+      }
     }
   });
 
@@ -75,10 +79,11 @@ export function useAlertTimeline({
   pumpStatusLabel,
   thresholds = {},
   maxWaterDistance = 20,
+  tankFullDistance = 2,
 }) {
   return useMemo(() => {
     const fromAlerts = buildFromAlerts(alerts || []);
-    const fromHistory = buildFromHistory(history || [], thresholds, maxWaterDistance);
+    const fromHistory = buildFromHistory(history || [], thresholds, maxWaterDistance, tankFullDistance);
 
     const pumpEvents = [];
     if (pumpStatus === 'DANG_TUOI') {
@@ -100,7 +105,7 @@ export function useAlertTimeline({
     });
 
     return unique.slice(0, 20);
-  }, [history, alerts, pumpStatus, pumpStatusLabel, thresholds, maxWaterDistance]);
+  }, [history, alerts, pumpStatus, pumpStatusLabel, thresholds, maxWaterDistance, tankFullDistance]);
 }
 
 export default function AlertTimeline({ events }) {

@@ -8,6 +8,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { firebaseService } from '../services/firebaseService';
 import { normalizeSensorPayload } from '../utils/normalizeSensor';
 import WeatherDayChart from './WeatherDayChart';
+import { DEFAULT_TANK_FULL_DISTANCE, waterDistanceToPercent } from '../utils/waterLevel';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 const VN_WEEKDAY = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
 const VN_DAY_SHORT = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 const OVERLAY_DAYS = 1;
@@ -52,7 +54,7 @@ const SENSOR_LIST = [
   { key: 'soilHum',     label: 'Đ.A đất',  unit: '%',  lib: 'mci', icon: 'sprout',        color: '#22c55e' },
   { key: 'airHum',      label: 'Đ.A KK',   unit: '%',  lib: 'ion', icon: 'water-outline', color: '#3b82f6' },
   { key: 'light',       label: 'Ánh sáng', unit: 'lux', lib: 'ion', icon: 'sunny-outline', color: '#f59e0b' },
-  { key: 'waterLevel',  label: 'Nước',     unit: 'cm', lib: 'ion', icon: 'water',         color: '#06b6d4' },
+  { key: 'waterLevel',  label: 'Mực nước bể', unit: '%', lib: 'ion', icon: 'water',         color: '#06b6d4', isWaterLevel: true },
 ];
 
 const SENSORS = Object.fromEntries(SENSOR_LIST.map((s) => [s.key, s]));
@@ -62,7 +64,7 @@ const SENSOR_INFO = {
   soilHum: 'Độ ẩm đất cho biết lượng nước còn trong đất. Giá trị thấp kéo dài có thể khiến cây thiếu nước; giá trị quá cao có thể gây úng rễ.',
   airHum: 'Độ ẩm không khí ảnh hưởng đến quá trình thoát hơi nước của lá. Không khí khô làm cây mất nước nhanh hơn.',
   light: 'Cường độ ánh sáng (lux) phản ánh lượng sáng cây nhận được trong ngày, hỗ trợ đánh giá vị trí đặt cây và che chắn.',
-  waterLevel: 'Mực nước đo khoảng cách từ cảm biến đến mặt nước. Giá trị càng nhỏ thường nghĩa là bể chứa càng đầy.',
+  waterLevel: 'Mực nước bể hiển thị theo % so với dung tích bể (100% = đầy, 0% = gần cạn).',
 };
 
 function Icon({ lib, name, size, color }) {
@@ -110,14 +112,29 @@ function normRaw(raw) {
   return { ts: toMs(raw.ts || raw.timestamp), ...n };
 }
 
-function dayAvg(entries, sensorKey) {
-  const vals = entries.map((e) => safeNum(e[sensorKey])).filter((v) => v != null);
+const DEFAULT_MAX_WATER_DIST = 20;
+const DEFAULT_TANK_FULL_DIST = DEFAULT_TANK_FULL_DISTANCE;
+
+function toSensorDisplayValue(val, sensorKey, maxWaterDist, tankFullDist) {
+  if (val == null) return null;
+  if (sensorKey === 'waterLevel') {
+    return waterDistanceToPercent(val, maxWaterDist, tankFullDist ?? DEFAULT_TANK_FULL_DIST);
+  }
+  return val;
+}
+
+function dayAvg(entries, sensorKey, maxWaterDist = DEFAULT_MAX_WATER_DIST, tankFullDist = DEFAULT_TANK_FULL_DIST) {
+  const vals = entries
+    .map((e) => toSensorDisplayValue(safeNum(e[sensorKey]), sensorKey, maxWaterDist, tankFullDist))
+    .filter((v) => v != null);
   if (!vals.length) return null;
   return Math.round(vals.reduce((s, v) => s + v, 0) / vals.length * 10) / 10;
 }
 
-function dayMinMax(entries, sensorKey) {
-  const vals = entries.map((e) => safeNum(e[sensorKey])).filter((v) => v != null);
+function dayMinMax(entries, sensorKey, maxWaterDist = DEFAULT_MAX_WATER_DIST, tankFullDist = DEFAULT_TANK_FULL_DIST) {
+  const vals = entries
+    .map((e) => toSensorDisplayValue(safeNum(e[sensorKey]), sensorKey, maxWaterDist, tankFullDist))
+    .filter((v) => v != null);
   if (!vals.length) return { min: null, max: null };
   return {
     min: Math.round(Math.min(...vals) * 10) / 10,
@@ -238,11 +255,11 @@ function SensorSelect({ value, onChange, dayStats }) {
   );
 }
 
-function lookupDayStats(dailyData, dateKey, entries, sensorKey) {
+function lookupDayStats(dailyData, dateKey, entries, sensorKey, maxWaterDist, tankFullDist) {
   const found = dailyData?.find((d) => d.dateKey === dateKey);
-  if (found) return found;
-  const range = dayMinMax(entries, sensorKey);
-  const avg = dayAvg(entries, sensorKey);
+  if (found && sensorKey !== 'waterLevel') return found;
+  const range = dayMinMax(entries, sensorKey, maxWaterDist, tankFullDist);
+  const avg = dayAvg(entries, sensorKey, maxWaterDist, tankFullDist);
   return {
     dateKey,
     [`${sensorKey}_avg`]: avg,
@@ -260,6 +277,20 @@ export default function HistoryDetailSheet({
   );
   const [loading, setLoading] = useState(true);
   const [multiDayData, setMultiDayData] = useState({});
+  const [maxWaterDist, setMaxWaterDist] = useState(DEFAULT_MAX_WATER_DIST);
+  const [tankFullDist, setTankFullDist] = useState(DEFAULT_TANK_FULL_DIST);
+
+  useEffect(() => {
+    Promise.all([
+      AsyncStorage.getItem('iot_max_water_distance'),
+      AsyncStorage.getItem('iot_tank_full_distance'),
+    ])
+      .then(([emptyV, fullV]) => {
+        if (emptyV) setMaxWaterDist(Number(emptyV));
+        if (fullV) setTankFullDist(Number(fullV));
+      })
+      .catch(() => {});
+  }, []);
 
   const effectiveDateKey = useMemo(
     () => (parseDateKey(selectedDateKey) ? selectedDateKey : todayKey()),
@@ -319,17 +350,17 @@ export default function HistoryDetailSheet({
   );
 
   const activeDayStats = useMemo(
-    () => lookupDayStats(dailyData, effectiveDateKey, entries, activeSensor),
-    [dailyData, effectiveDateKey, entries, activeSensor],
+    () => lookupDayStats(dailyData, effectiveDateKey, entries, activeSensor, maxWaterDist, tankFullDist),
+    [dailyData, effectiveDateKey, entries, activeSensor, maxWaterDist, tankFullDist],
   );
 
   const yesterdayAvg = useMemo(
-    () => dayAvg(yesterdayEntries, activeSensor),
-    [yesterdayEntries, activeSensor],
+    () => dayAvg(yesterdayEntries, activeSensor, maxWaterDist, tankFullDist),
+    [yesterdayEntries, activeSensor, maxWaterDist, tankFullDist],
   );
   const yesterdayRange = useMemo(
-    () => dayMinMax(yesterdayEntries, activeSensor),
-    [yesterdayEntries, activeSensor],
+    () => dayMinMax(yesterdayEntries, activeSensor, maxWaterDist, tankFullDist),
+    [yesterdayEntries, activeSensor, maxWaterDist, tankFullDist],
   );
 
   const avg = safeNum(activeDayStats?.[`${activeSensor}_avg`]);

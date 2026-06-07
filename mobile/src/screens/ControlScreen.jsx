@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet,
   SafeAreaView, ScrollView, ActivityIndicator, StatusBar,
@@ -7,6 +7,8 @@ import {
 import Svg, { Path, Text as SvgText, Circle } from 'react-native-svg';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useMqtt } from '../MqttContext';
+import { firebaseService } from '../services/firebaseService';
+import { DEFAULT_TANK_FULL_DISTANCE, splitDeviceConfig, waterDistanceToPercent } from '../utils/waterLevel';
 
 const BG     = '#f5f8f5';
 const WHITE  = '#ffffff';
@@ -157,10 +159,11 @@ const ms = StyleSheet.create({
 });
 
 /* ── Quick Sensor Tiles ───────────────────────────────────────────────────── */
-function SensorTiles({ sensorData, maxWaterDist }) {
+function SensorTiles({ sensorData, maxWaterDist, tankFullDist }) {
   const wDist = sensorData?.waterLevel ?? null;
   const maxD  = maxWaterDist ?? 20;
-  const wPct  = wDist != null ? Math.max(0, Math.min(100, Math.round((1 - wDist / maxD) * 100))) : null;
+  const fullD = tankFullDist ?? DEFAULT_TANK_FULL_DISTANCE;
+  const wPct  = waterDistanceToPercent(wDist, maxD, fullD);
 
   const tiles = [
     { lib: 'mci', icon: 'thermometer',   label: 'Nhiệt độ', val: sensorData?.temperature, unit: '°C', color: '#f97316' },
@@ -256,6 +259,30 @@ const sb = StyleSheet.create({
 export default function ControlScreen() {
   const { mqttStatus, pumpState, autoMode, sensorData, setPumpState, setAutoMode, publishControl } = useMqtt();
   const [sending, setSending] = useState(null);
+  const [maxWaterDist, setMaxWaterDist] = useState(20);
+  const [tankFullDist, setTankFullDist] = useState(DEFAULT_TANK_FULL_DISTANCE);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+        const [emptyV, fullV] = await Promise.all([
+          AsyncStorage.getItem('iot_max_water_distance'),
+          AsyncStorage.getItem('iot_tank_full_distance'),
+        ]);
+        if (emptyV) setMaxWaterDist(Number(emptyV));
+        if (fullV) setTankFullDist(Number(fullV));
+      } catch {}
+    })();
+
+    const unsub = firebaseService.subscribeConfig((cfg) => {
+      const { tankEmpty, tankFull, tankCalibrated } = splitDeviceConfig(cfg);
+      if (!tankCalibrated) return;
+      if (tankEmpty != null && tankEmpty > 0) setMaxWaterDist(tankEmpty);
+      if (tankFull != null && tankFull >= 0) setTankFullDist(tankFull);
+    });
+    return unsub;
+  }, []);
 
   const send = useCallback((cmd) => {
     if (sending) return;
@@ -299,7 +326,7 @@ export default function ControlScreen() {
           </View>
 
           {/* Quick sensor tiles */}
-          <SensorTiles sensorData={sensorData} />
+          <SensorTiles sensorData={sensorData} maxWaterDist={maxWaterDist} tankFullDist={tankFullDist} />
 
           <Text style={s.sectionLabel}>Thao tác</Text>
           <View style={s.controlCard}>

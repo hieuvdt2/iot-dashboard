@@ -6,7 +6,7 @@ export const SENSOR_CONFIG = [
   { key: 'nhiet_do', label: 'Nhiệt độ', unit: '°C', icon: '🌡️', color: '#ff6b6b' },
   { key: 'do_am_khong_khi', label: 'Độ ẩm KK', unit: '%', icon: '💧', color: '#4dabf7' },
   { key: 'do_am_dat', label: 'Độ ẩm đất', unit: '%', icon: '🌱', color: '#51cf66' },
-  { key: 'muc_nuoc', label: 'Mực nước', unit: 'cm', icon: '🌊', color: '#ffd43b' },
+  { key: 'muc_nuoc', label: 'Mực nước bể', unit: '%', icon: '🌊', color: '#ffd43b', isWaterLevel: true },
 ];
 
 export function addToHistory(prevHistory, newData) {

@@ -8,6 +8,25 @@ import {
   getDateKeys,
 } from '../utils/sensorHistory';
 import { firebaseService } from '../services/firebaseService';
+import { DEFAULT_TANK_FULL_DISTANCE, waterDistanceToPercent } from '../utils/waterLevel';
+
+function readMaxWaterDistance() {
+  try {
+    const v = localStorage.getItem('iot_max_water_distance');
+    return v ? Number(v) : 20;
+  } catch {
+    return 20;
+  }
+}
+
+function readTankFullDistance() {
+  try {
+    const v = localStorage.getItem('iot_tank_full_distance');
+    return v ? Number(v) : DEFAULT_TANK_FULL_DISTANCE;
+  } catch {
+    return DEFAULT_TANK_FULL_DISTANCE;
+  }
+}
 
 /* ── Config ─────────────────────────────────────────────────────────────── */
 
@@ -16,7 +35,7 @@ const SENSORS = [
   { key: 'do_am_dat',       label: 'Độ ẩm đất',       unit: '%',   icon: 'sprout',      color: '#22c55e', areaColor: ['#22c55e40', '#22c55e00'] },
   { key: 'do_am_khong_khi', label: 'Độ ẩm không khí', unit: '%',   icon: 'droplets',    color: '#3b82f6', areaColor: ['#3b82f640', '#3b82f600'] },
   { key: 'anh_sang',        label: 'Ánh sáng',         unit: 'lux', icon: 'sun',         color: '#f59e0b', areaColor: ['#f59e0b40', '#f59e0b00'] },
-  { key: 'muc_nuoc',        label: 'Mực nước',         unit: 'cm',  icon: 'container',   color: '#a855f7', areaColor: ['#a855f740', '#a855f700'] },
+  { key: 'muc_nuoc',        label: 'Mực nước bể',      unit: '%',   icon: 'container',   color: '#a855f7', areaColor: ['#a855f740', '#a855f700'], isWaterLevel: true },
 ];
 
 const RANGES = [
@@ -33,7 +52,24 @@ export default function SensorChart() {
   const [rawData,   setRawData]   = useState([]);
   const [loading,   setLoading]   = useState(false);
   const [lastSync,  setLastSync]  = useState(null);
+  const [maxWaterDistance, setMaxWaterDistance] = useState(readMaxWaterDistance);
+  const [tankFullDistance, setTankFullDistance] = useState(readTankFullDistance);
   const chartRef = useRef(null);
+
+  useEffect(() => {
+    const onStorage = () => {
+      setMaxWaterDistance(readMaxWaterDistance());
+      setTankFullDistance(readTankFullDistance());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  const toDisplayValue = useCallback((val, key) => {
+    if (val == null) return null;
+    if (key === 'muc_nuoc') return waterDistanceToPercent(val, maxWaterDistance, tankFullDistance);
+    return val;
+  }, [maxWaterDistance, tankFullDistance]);
 
   const sensor      = SENSORS.find((s) => s.key === sensorKey) ?? SENSORS[0];
   const activeRange = RANGES.find((r) => r.key === range)      ?? RANGES[0];
@@ -57,17 +93,17 @@ export default function SensorChart() {
 
   /* Stats */
   const stats = useMemo(() => {
-    const vals = rawData.map((d) => d[sensorKey]).filter((v) => v != null);
+    const vals = rawData.map((d) => toDisplayValue(d[sensorKey], sensorKey)).filter((v) => v != null);
     if (!vals.length) return null;
     const min = Math.min(...vals), max = Math.max(...vals);
     const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
     return { min, max, avg };
-  }, [rawData, sensorKey]);
+  }, [rawData, sensorKey, toDisplayValue]);
 
   /* ECharts option */
   const option = useMemo(() => {
     const xData  = rawData.map((d) => d.time);
-    const yData  = rawData.map((d) => d[sensorKey] ?? null);
+    const yData  = rawData.map((d) => toDisplayValue(d[sensorKey], sensorKey));
     const avgVal = stats?.avg ?? null;
 
     return {
@@ -117,6 +153,8 @@ export default function SensorChart() {
 
       yAxis: {
         type: 'value',
+        min: sensorKey === 'muc_nuoc' ? 0 : undefined,
+        max: sensorKey === 'muc_nuoc' ? 100 : undefined,
         axisLabel: {
           color: '#9ca3af',
           fontSize: 10,
@@ -160,7 +198,7 @@ export default function SensorChart() {
         },
       ],
     };
-  }, [rawData, sensorKey, sensor, range, stats]);
+  }, [rawData, sensorKey, sensor, range, stats, toDisplayValue]);
 
   const hasData = rawData.length > 0 && rawData.some((d) => d[sensorKey] != null);
 

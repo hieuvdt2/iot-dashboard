@@ -2876,6 +2876,66 @@ body {
   color: var(--text-2);
 }
 
+.water-tank-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-3);
+}
+
+.water-tank-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.water-tank-unit-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.water-tank-unit-label {
+  font-size: 0.82rem;
+  color: var(--text-2);
+  font-weight: 600;
+}
+
+.water-tank-unit-btn {
+  min-width: 42px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-2);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.water-tank-unit-btn.active {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.water-tank-unit-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.water-tank-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.water-tank-save {
+  min-width: 180px;
+}
+
 .water-tank-input-row {
   display: flex;
   align-items: center;
@@ -2938,6 +2998,66 @@ body {
   background: #1e293b;
   border-color: #334155;
   color: #93c5fd;
+}
+
+.water-tank-calib {
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.water-tank-calib-title {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #166534;
+}
+
+.water-tank-calib-steps {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.85rem;
+  color: #15803d;
+  line-height: 1.5;
+}
+
+.water-tank-calib-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.water-tank-calib-btn {
+  border: 1px solid #86efac;
+  background: #fff;
+  color: #166534;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.water-tank-calib-btn:hover {
+  background: #dcfce7;
+}
+
+.water-tank-calib-btn--full {
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.water-tank-calib-btn--full:hover {
+  background: #eff6ff;
+}
+
+.water-tank-calib-warn {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #b45309;
 }
 
 .preset-layout {

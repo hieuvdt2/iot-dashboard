@@ -5,7 +5,7 @@ export const SENSOR_KEYS = [
   { key: 'do_am_khong_khi', label: 'Độ ẩm KK (%)',    color: '#4dabf7' },
   { key: 'do_am_dat',       label: 'Độ ẩm đất (%)',   color: '#51cf66' },
   { key: 'anh_sang',        label: 'Ánh sáng (lux)',  color: '#ffa94d' },
-  { key: 'muc_nuoc',        label: 'Mực nước (cm)',   color: '#ffd43b' },
+  { key: 'muc_nuoc',        label: 'Mực nước bể (%)', color: '#ffd43b' },
 ];
 
 const SENSOR_FIELDS = SENSOR_KEYS.map((s) => s.key);
